@@ -1,0 +1,1 @@
+PKG_LIBS = -l gsl -l gslcblas

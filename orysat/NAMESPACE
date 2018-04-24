@@ -1,0 +1,4 @@
+import(RiceMap)
+import(genutils)
+useDynLib(PhenoRiceMap)
+exportPattern("^[[:alpha:]]+")
