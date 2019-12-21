@@ -1,0 +1,11 @@
+Package: cropsim
+Type: Package
+Title: Simulation modeling of crops and their diseases
+Version: 0.2.1
+Date: 2009-9-27
+Depends: methods, raster, GloCR
+Author: Robert J. Hijmans, Serge Savary, Rene Pangga, Jorrel Khalil Aunario
+Maintainer: Robert J. Hijmans <r.hijmans@gmail.com>
+Description: An R implementation of rice disease models originally written in Stella  
+License: GPL-3
+LazyLoad: yes
