@@ -1,4 +1,4 @@
-import(RiceMap)
-import(genutils)
-useDynLib(PhenoRiceMap)
+import(rgdal)
+import(RemoteSensing)
+import(parallel)
 exportPattern("^[[:alpha:]]+")

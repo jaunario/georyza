@@ -29,12 +29,6 @@ Forest <- function(ndvi){ sum( ndvi >= 0.7 , na.rm=T) >= 20}	# Forest: 1, ; not 
 Shrub <- function(lswi){ sum(lswi < 0.1, na.rm=T) == 0 } # shrub=1; not shrub = 0
 # Bare <- function(ndvi){ sum(ndvi > 0.1, na.rm=T) < 2 }
 
-Flooded <- function (flooded) {sum(flooded, na.rm=T) > 0}	#Flooded= 1  ; not flooded = 0	
-Permanent <- function (permanent) { sum(permanent, na.rm=T) >= 10} # permanent = 1; not permanet = 0
-Forest <- function(ndvi){ sum( ndvi >= 0.7 , na.rm=T) >= 20}	# Forest: 1, ; not forest =0
-Shrub <- function(lswi){ sum(lswi < 0.1, na.rm=T) == 0 } # shrub=1; not shrub = 0
-# Bare <- function(ndvi){ sum(ndvi > 0.1, na.rm=T) < 2 }
-
 modis.rice <- function(modis, writeto="./rice", verbose=TRUE){
 	#check if 64bit
 	is64 <- version$arch=="x86_64"

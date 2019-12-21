@@ -5,11 +5,6 @@
 # Licence GPL v3
 
 # Cloud Mask
-.cloudMask <- function(b3){
-#	res <- (((b3 > 18)*0) + (b3 < 18))
-	res <- b3 < 0.18
-    return(res)
-}
 
 # Internal cloud  algorithm flag
 #.internalCloud <- function (pixel) {
@@ -27,18 +22,9 @@
 #	return(pixel)
 #}
 
-# Water mask
-.waterMask <- function(pixel) {
-	vals <- modis.sqa500c(pixel)
-	res <- (!(vals == 2 | vals >= 3)) & (vals >= 1)
-	return(res)
-}
-
-#Internal Snow mask
-.snowMask <- function(pixel) {
-	vals <- modis.sqa500k(pixel)
-	vals <- vals + 1
-	res <- vals <= 1
+# Blue band-based cloud mask
+blue.cloud <- function(b03){    
+	res <- b03 >= 0.18
 	return(res)
 }
 
@@ -49,6 +35,20 @@
 #	pixel[is.na(pixel)] <- 0
 #	return(pixel)
 #}
+
+# Water mask
+stateflags.water <- function(state_500m){    
+	vals <- modis.sqa500c(state_500m)
+	res <- vals!=1
+	return(res)
+}
+
+#Internal Snow mask
+stateflags.snow <- function(state_500m){    
+	vals <- modis.sqa500k(state_500m)
+	res <- vals == 1
+	return(res)
+}
 
 #second snow mask
 snow2 <- function(ndsi, nir) {    
@@ -65,19 +65,8 @@ snow3 <- function(ndsi, green, nir) {
 	return(res)
 }
 
-cloud <- function(b03){    
-    return(.cloudMask(b03))
-}
-
-water <- function(state_500m){    
-    return(.waterMask(state_500m))    
-}
-
-snow <- function(state_500m){    
-    return(.snowMask(state_500m))    
-}
-
 modis.mask <- function(modvals, masks){
+	#DEPRECATE
     masks <- as.matrix(masks)
     m <- rowSums(masks, na.rm=TRUE)
     mm <- which(m<ncol(masks)) 
@@ -88,6 +77,7 @@ modis.mask <- function(modvals, masks){
 }
 
 modisMask <- function(qcfile, b3file, saveRasters=TRUE, outdir=NULL){
+	#DEPRECATE
     namecomps <- unlist(strsplit(basename(qcfile),"\\."))
     rq <- raster(qcfile)
 	b3 <- raster(b3file)

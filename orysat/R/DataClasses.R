@@ -26,5 +26,5 @@ setClass ("modis.data",
         nrows = 2400,
 		cached = FALSE,
         imgvals = NULL),
-    package="RiceMap"
+    package="orysat"
 )

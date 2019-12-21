@@ -5,6 +5,7 @@
 # Licence GPL v3
 
 modis.compute <- function(modis, funlist ,datatype="numeric"){
+	# DEPRECATE
     result <- do.call(datatype,as.list(0))
     for (i in 1:length(funlist)){
         argnames <- names(formals(get(funlist[i])))
@@ -21,13 +22,4 @@ modis.compute <- function(modis, funlist ,datatype="numeric"){
     }
     colnames(result) <- funlist
     return(result)
-}
-
-getRequiredBands <- function(funlist, byfun=FALSE){
-	if (byfun) argnames <- list() else argnames <- NULL  
-	for (i in 1:length(funlist)){
-		if (byfun) argnames[[funlist[i]]] <- names(formals(get(funlist[i]))) else argnames <- c(argnames,names(formals(get(funlist[i]))))
-	}
-	if (byfun) names(argnames) <- funlist else argnames <- unique(argnames)
-	return(argnames)
 }
