@@ -1,11 +1,12 @@
-Package: cropsim
+Package: orynfect
 Type: Package
-Title: Simulation modeling of crops and their diseases
-Version: 0.2.1
-Date: 2009-9-27
-Depends: methods, raster, GloCR
-Author: Robert J. Hijmans, Serge Savary, Rene Pangga, Jorrel Khalil Aunario
-Maintainer: Robert J. Hijmans <r.hijmans@gmail.com>
-Description: An R implementation of rice disease models originally written in Stella  
+Title: Simulation modeling of rice diseases
+Version: 0.0.1
+Date: 2019-12-21
+Depends: methods
+Recommend: raster
+Author: Jorrel Khalil Aunario, Robert J. Hijmans, Serge Savary, Rene Pangga 
+Maintainer: Jorrel Khalil Aunario <jaunario@gmail.com>
+Description: An R implementation of rice disease models originally written in Stella. It is forked from the cropsim package found in r-forge  
 License: GPL-3
 LazyLoad: yes
