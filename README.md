@@ -1,3 +1,14 @@
+# Contents
+
+1. [Getting started](#getting-started)
+2. [Requirements](#requirements)
+   1. [System libraries](#system-libraries)
+   2. [R packages](#r-packages)
+   3. [R packages installation guides](#r-packages-installation-guides)
+      * [Installing R packages](#installing-r-packages)
+      * [Building binary R packages from source](#building-binary-r-packages-from-source)
+      * [Installing binary R packages](#installing-binary-r-packages)
+
 # Getting started
 
 ```r
@@ -125,7 +136,7 @@ Below are the R packages needed to run the R script:
    ```
    The command statement will output a binary tarball file like so: `orynfect_x.x.x.tar.gz`
 
-### Installing built binary R packages
+### Installing binary R packages
 
 1. Download a copy of [orynfect_0.0.1.tar.gz](#) and [orysat_0.0.3.tar.gz](#) packages. Alternatively, you can [build your own binary packages](#building-binary-packages).
 
