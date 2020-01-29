@@ -69,6 +69,8 @@ ggsave("files/sample.leafblast.png")
 Whether you are on Windows, Mac, or Linux you will need to install the required system libraries:
 
 1. [GDAL](https://gdal.org/)
+   * [For windows](https://trac.osgeo.org/osgeo4w/)
+   * For Mac, `brew install gdal`
 
 ## R packages
 
@@ -82,6 +84,7 @@ Below are the R packages needed to run the R script:
 6. `GloCR`
 7. `raster`
 8. `rgdal`
+9. `ggplot2`
 
 ## R package installation guides
 
