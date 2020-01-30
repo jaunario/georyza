@@ -7,4 +7,7 @@
 *.rds
 *.Rcheck
 *.tar.gz
+<<<<<<< HEAD
 *.project
+=======
+>>>>>>> 96274e45e937c50597309ec095a6eea60266de2d
