@@ -27,7 +27,8 @@ modisRiceValidate <- function(perhapsPath, eviPath, outPath, tileNumber, year, v
     #   perhapsRice <- perhapsRice[getthis]
     #}
 	pRice <- raster(paste(perhapsPath,perhapsRice[1],sep="/"))
-    
+  
+	# Get EVI rasters from previous year  
 	files <- list.files(eviPath, pattern=paste(year-1,tileNumber, "evi.cleaned", sep=".*"))
 	files <- paste(eviPath, files, sep="/")
 	st <- grep("249",files)
@@ -41,30 +42,33 @@ modisRiceValidate <- function(perhapsPath, eviPath, outPath, tileNumber, year, v
 	
 	stck <- stack(c(files[st:length(files)], files2))	
     riceRast2 <- numeric(0)
-    
+  
+  # Validate pixels by row   
 	for( r in 1:nrow(pRice) ){
 		message("Row:", r,"\n")
 		
-		
+		# Get EVI values from the stack at Row r. Output as a matrix, where each row is a vector of EVI of a pixel 
 		vals <- t(getValues(stck, r))
 		vals[vals==-9999] <- NA
 		if(!is.null(valscale)){
-            vals <- vals/valscale
-        }                    
-                    
+      vals <- vals/valscale
+    }                    
+    
+		# Get potential rice flag from PerhapsRice raster at Row r                
 		pVec <- getValues(pRice, r)
 		rice <- rep(0,length(pVec))
 		
 		# get perhaps rice
 		pvec1 <- which(pVec==1)
 		if (length(pvec1)==0){
-            riceRast2 <- c(riceRast2,rice)
-            next          
-        }
+      riceRast2 <- c(riceRast2,rice)
+      next          
+    }
         
-        #Flag pixels as detected with water but not rice
-        rice[pvec1]<- 2            
-		# find flooding in EVIs
+    #Flag pixels as detected with water but not rice
+    rice[pvec1]<- 2            
+		
+    # find flooding in EVIs
 		fld <- vals[,pvec1]<=floodT
 		nfld <- colSums(as.matrix(fld), na.rm=TRUE)
 		 
