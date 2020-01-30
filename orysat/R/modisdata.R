@@ -95,33 +95,3 @@ setMethod("modis.data", signature(x="character"),
 		}		
 )
 
-modis.brick <- function(modis, process=NULL, intlayers=NULL, writeto=NULL, intNA=-15, fltNA=-9999.0, format="GTiff", skipx=FALSE, ...){
-	if(!file.exists(writeto)) dir.create(writeto, recursive=TRUE)
-	mraster <- raster(modis@extent, ncols=modis@ncols, nrows=modis@nrows, crs=modis@projection)
-    
-    if(is.character(writeto)){                
-        fname <- gsub("\\.\\.", "\\.", paste(modis@product, modis@acqdate, modis@zone, modis@version, modis@proddate, colnames(modis@imgvals), process, formatExt(format), sep="."))        
-        fname <- as.character(paste(writeto,fname,sep="/"))          
-    } else mbrick <- brick(mraster)
-
-	for(i in 1:ncol(modis@imgvals)){
-		if(skipx & file.exists(fname[i])) next
-        mraster <- setValues(mraster,modis@imgvals[,i])
-        
-        if(!is.null(intlayers) & is.numeric(intlayers)){
-            dataType(mraster) <- ifelse(i %in% intlayers,"INT1U","FLT4S")                
-        } else if(!is.null(intlayers)){
-			message("Ignoring intlayers. Should be 1:ncol(modis@imgvals) instead of", paste(intlayers, collapse=","))
-		}
-        
-        if(is.character(writeto)) {            
-            if (dataType(mraster)== "INT1U"){
-                writeRaster(mraster,filename=fname[i], format=format, NAflag=intNA, ...)
-            } else {
-                writeRaster(mraster,filename=fname[i], format=format, NAflag=fltNA, ...)
-            }
-        } else  mbrick <- addLayer(mbrick,mraster)
-    }
-	if(is.character(writeto)) mbrick <- TRUE else mbrick@layernames <- colnames(modis@imgvals)
-    return(mbrick)
-}

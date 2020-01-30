@@ -6,3 +6,5 @@
 .RData
 *.rds
 *.Rcheck
+*.tar.gz
+*.project

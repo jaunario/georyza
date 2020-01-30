@@ -7,8 +7,6 @@ DL.FAST  = 0 # If already exists, skip
 DL.SMART = 1 # If already exists, check integrity. If integrity passed, skip else delete then download again
 DL.RENEW = 2 # If exists redownload
 
-modprods <- read.csv(system.file("satproducts/modis.products.ref.csv", package="orysat"), stringsAsFactors=FALSE)
-
 check.integrity <- function(modis.hdf, xml){
 	cksumver <- Sys.which("cksum")	
 	if (cksumver==""){
@@ -32,7 +30,7 @@ download.modis <- function(tile, years, userpwd, doy=NULL, product="MOD09A1", pr
 	
 	
 	
-	#Initialize required objects
+	# Initialize required objects
 	if (is.null(savepath)){
 		dirs <- apply(expand.grid(product, tile, stringsAsFactors = FALSE), FUN = paste, MARGIN = 1, collapse="/")
 		lapply(dirs, FUN=dir.create,recursive=TRUE)
@@ -160,3 +158,22 @@ download.modis <- function(tile, years, userpwd, doy=NULL, product="MOD09A1", pr
 	
 	return(result)
 }
+
+
+# TODO: Functions below may be deprecated
+validFolders <- function(styear=2000, enyear=as.numeric(format(Sys.Date(),"%Y"))){
+  valid <- vector()
+  for (y in styear:enyear){
+    st <- ifelse(y==2000,paste(y,"2","18",sep="-"),paste(y,"1","1",sep="-"))
+    valid <- c(valid,format(seq(from=as.Date(st), to=as.Date(paste(y,"12","31",sep="-")), by=8),"%Y.%m.%d"))
+  }
+  return(valid)
+}
+
+subFolderFromDoy <- function(doy,year){
+  valid <- validFolders()
+  dirdate <- format(as.Date(paste(doy, year),"%j %Y"),"%Y.%m.%d")
+  dirdate[dirdate %in% valid] 
+  return(dirdate[dirdate %in% valid])
+}
+
