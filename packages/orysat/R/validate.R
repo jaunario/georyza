@@ -1,0 +1,245 @@
+# Author: Andrew Nelson, Sonia Asilo, Jorrel Khalil Aunario 
+# International Rice Research Institute
+# Date : 21 May 2010
+# Version 0,1
+# Licence GPL v3
+
+
+ricefile.attribs <- function(filename, sep="\\."){
+    fname <- basename(filename) 
+    noExt <- substr(fname, 1, nchar(fname)-4)
+    if(length(filename)==1){
+        initattrib <- t(unlist(strsplit(noExt, sep)))    
+    } else if (length(filename)>1){
+        initattrib <- matrix(unlist(strsplit(noExt, sep)),ncol=4,byrow=TRUE)
+    }
+    attribs <- cbind(as.numeric(substr(initattrib[,1],2,5)), as.numeric(substr(initattrib[,1],6,8)))
+    colnames(attribs) <- c("year", "doy")
+    attribs <- as.data.frame(attribs, stringsAsFactors=FALSE)
+    attribs$date <- format(as.POSIXct((as.integer(attribs$doy)-1)*60*60*24,origin=paste(attribs$year,1,1,sep="-")), "%Y-%m-%d")
+    attribs$tile <- initattrib[,2]
+    #process band
+    attribs$band <- initattrib[,3]
+    return(attribs)
+}
+
+validationFiles <- function(path, informat="GTiff"){
+    floodfiles <- list.files(path, pattern=paste("flood",formatExt(informat),sep=".*."))
+    ndvifiles <- list.files(path, pattern=paste("ndvi",formatExt(informat),sep=".*."))
+    evifiles <- list.files(path, pattern=paste("evi",formatExt(informat),sep=".*."))
+    if(length(floodfiles)!=length(ndvifiles) & length(floodfiles)!=length(evifiles)) {
+        stop("Incomplete data")
+    }
+    properties <- cbind(ricefile.attribs(floodfiles), floodfiles, ndvifiles, evifiles, stringsAsFactors=FALSE)
+    return(properties)
+}
+
+maxEVI <- function(evidata){
+    if (class(evidata)=="matrix"){
+        maxevi <- rep(NA, nrow(evidata))
+        for (i in 1:ncol(evidata)){
+            maxevi <- pmax(evidata[,i], maxevi, na.rm=TRUE)
+        }        
+    } else {
+        maxevi <- max(evidata, na.rm=TRUE)
+    }    
+    return(maxevi)
+}
+
+rmColumn <- function(mat, colnum){
+    mat <- mat[,-colnum]
+    return(mat)
+}
+
+modis.validate <- function(modis, modisroot, yr, writeto="./realrice", verbose=TRUE){
+	
+	if(!file.exists(writeto)){
+		dir.create(writeto, recursive=TRUE)	
+	} 
+	
+	outdir <- normalizePath(writeto, mustWork=FALSE)
+	
+	if(class(modis)!="modis.data") stop("Invalid input data. 'modis' Should be of class \"modis.data\"")
+	
+	floodpath <- paste(modisroot, "identify", sep="/")
+	idfs <- modisFiles(path=floodpath, modisinfo=c("product","acqdate","zone","version","proddate","band","process"), full.names=TRUE)	
+	flds <- idfs[grep("flood",idfs$band),]
+	# Gets the index of the last image (DOY 361) of the previous year
+	fld0 <- grep(paste("A",yr-1,"361",sep=""),flds$acqdate) 
+	if (length(fld0)<1) {
+		message("WARNING: Missing last flood image from year ", yr-1,eol="\n")
+		fld0 <- min(grep(yr,flds$year))
+	}	
+	flds <- flds[fld0:max(grep(yr,flds$year)),]
+	
+	evipath <- paste(modisroot, "veg", sep="/")
+	infs <- modisFiles(path=evipath, modisinfo=c("product","acqdate","zone","version","proddate","band","process"), full.names=TRUE)	
+	evis <- infs[infs$band=="evi",]
+	# Gets the index of the 12th image (DOY 89) of the next year
+	eny12 <- grep(yr+1,evis$year)
+	# if (length(eny12)<12) message("WARNING: 12 images from year ", yr+1, " incomplete.",eol="\n")
+	en <- max(eny12)	
+	evis <- evis[min(grep(yr,flds$year)):en,]
+		
+	vpix <- which(modis@imgvals$perhapsrice==1)
+	
+	ricefreq <- rep(NA,nrow(modis@imgvals))
+	rppdoy <- integer(0)
+	
+	for (i in 1:nrow(flds)){
+		if (verbose) message(flds$acqdate[i], ": Aquiring flood data.", appendLF=TRUE)
+		fdoy <- flds$doy[i]
+		pdoys <- ((0:45)*8+1)
+		did <- which(fdoy==pdoys)
+		if (did>34 & did<46){
+			pdoy1 <- pdoys[(did+1):46]
+			eid1 <- which(evis$doy %in% pdoy1 & evis$year==flds$year[i])	
+			pdoy2 <- pdoys[1:(did-34)]
+			eid2 <- which(evis$doy %in% pdoy2 & evis$year==(flds$year[i]+1))
+			eid <- c(eid1,eid2)
+			pdoy <- c(pdoy1,pdoy2)
+		}  else if (did==46) {	
+			pdoy <- pdoys[1:12]
+			eid <- which(evis$doy %in% pdoy  & evis$year==flds$year[i]+1)
+		} else {
+			pdoy <- pdoys[did:(did+12)]
+			eid <- which(evis$doy %in% pdoy & evis$year==flds$year[i])
+		}
+
+		dne <- pdoy[which(!pdoy %in% evis$doy[eid])]
+		
+		if (length(dne)>0) message(flds$acqdate[i], ": Warning - Incomplete data. Missing DOY(s) ", (paste(dne,collapse=", ")),eol="\n")
+		
+		
+		fraster <- raster(flds$filename[i])
+		fldvals <- as.integer(fraster[])
+		fpix <- vpix[which(fldvals[vpix]==1)]
+		if (verbose) message(flds$acqdate[i], ": Retrieving evis.", appendLF=TRUE)
+		evivals <- values(stack(evis$filename[eid]))[fpix,]			
+		colnames(evivals) <- evis$doy[eid]
+		
+		if (verbose) message(flds$acqdate[i], ": Identifying rice pixels.", appendLF=TRUE)			
+		i5 <- which(colnames(evivals) %in% pdoy[1:5])
+		i12 <- which(colnames(evivals) %in% pdoy)
+		i611 <- which(colnames(evivals) %in% pdoy[6:11])
+		max5 <- maxEVI(evivals[,i5])
+		max12 <- maxEVI(evivals[,i12])
+		ave611 <- rowMeans(evivals[, i611], na.rm=TRUE)
+		truerice <- (max5*2 >= max12) & (ave611>0.35)
+		rppdoy <- c(rppdoy, sum(truerice))
+		ricefreq[fpix] <- rowSums(cbind(ricefreq[fpix], truerice), na.rm=TRUE)
+		
+		validatedrice <- modis.data(modis)
+		validatedrice@acqdate <- flds$acqdate[i]
+		rice <- rep(NA,ncell(fraster))
+		rice[fpix] <- truerice
+		validatedrice@imgvals <- as.data.frame(rice)
+		if (verbose) message(flds$acqdate[i], ": Writing rice raster.", appendLF=TRUE)
+		modis.brick(validatedrice, process="validate", intlayers=1,writeto=outdir, options="COMPRESS=LZW", overwrite=TRUE)	
+		rm(rice,validatedrice,evivals,fldvals,fpix)
+		gc(verbose=FALSE)
+		if (verbose) message(flds$acqdate[i], ": Done \n", appendLF=TRUE)
+	}
+	validatedrice <- modis.data(modis)	
+	rice <- ricefreq > 0
+	validatedrice@imgvals <- as.data.frame(cbind(ricefreq,rice))
+	modis.brick(validatedrice, process="validate", intlayers=1:2, writeto=outdir, options="COMPRESS=LZW", overwrite=TRUE)
+	
+	png(filename=paste(outdir,paste(yr,"npix_riceplot.png", sep="_"),sep="/"), type="cairo", width=1024, height=768)    
+	barplot(rppdoy, names.arg=flds$doy[fld0:max(grep(yr,flds$year))], main="Counts of identified rice pixels per DOY")
+	dev.off()	
+	
+	if (verbose) message("------------- MODIS RICE VALIDATE DONE! -------------", appendLF=TRUE)
+	return(outdir)
+}
+
+validateRice <- function(inpath, year="All", informat="GTiff", outformat="GTiff", valscale=1){
+    outpath <- paste(inpath, "../rice_new", sep="/")
+    ricepath <- paste(inpath, "../rice", sep="/")
+    if (!file.exists(outpath)) dir.create(outpath, recursive=TRUE)
+    filext <- formatExt(informat)
+    if (is.na(filext)){
+        stop("Invalid input format")
+    }
+    vfiles <- modisFiles(path=inpath, modisinfo=c("product","acqdate","zone","version", "proddate", "band","process"))
+    #vfiles <- validationFiles(inpath,informat)
+    if (year=="All"){
+        years <- unique(vfiles$year) 
+    } else {
+        years <- year
+    }
+    for(y in years){
+        st <- which(vfiles$year==y & vfiles$doy==1)-1
+        en <- which(vfiles$year==y & vfiles$doy==361)-1
+        if (st<1){
+            message(paste("Data from last image from previous year not available.\nWill start on first image of year ", y, ".",sep=""), appendLF=TRUE)
+            st <- 1            
+        }
+        perhaps <- paste(ricepath, paste("perhapsrice_", vfiles$tile[1], "_", y, ".", filext, sep=""), sep="/")
+        pr <- raster(perhaps)
+            
+        counts <- vector(length=length(st:en))
+        for (i in st:en){
+            if(i==(nrow(vfiles)-12)){
+                message("Succeeding files not found.", appendLF=TRUE)
+                break
+            }
+            message(paste("Processing DOY", vfiles$doy[i+1], "of", y), appendLF=TRUE)
+            message("Isolating flooded pixels.", appendLF=TRUE)
+            fld <- raster(paste(inpath,vfiles$floodfiles[i],sep="/"))
+            if (file.exists(perhaps)){
+                mfld <- pr[]*fld[]
+                fpix <- which(mfld==1)                 
+            } else {
+                fpix <- which(fld[]==1)                            
+            }
+            #if (i==st){
+            #    overall <- rep(NA,ncell(fld))
+            #    evi12 <- getValues(stack(paste(inpath,vfiles$evifiles[i+(1:12)],sep="/")))
+            #} else {
+            #    evi12 <- rmColumn(evi12,1)
+            #    gc(verbose=FALSE)
+            #    evi12 <- cbind(evi12,raster(paste(inpath,vfiles$evifiles[i+12],sep="/"))[])
+            #}
+            if(i==st){
+                overall <- rep(NA,ncell(fld))
+            }
+            message(paste("Reading EVI values: Files", i+1, "to", i+12), appendLF=TRUE)
+            evi12 <- getValues(stack(paste(inpath,vfiles$evifiles[i+(1:12)],sep="/")))[fpix,]
+            evi12[evi12==-9999] <- NA
+            evi12 <- evi12/valscale
+            message("Calculating statistics.", appendLF=TRUE)
+            max5 <- maxEVI(evi12[,1:5])*2
+            max12 <- maxEVI(evi12)
+            ave611 <- rowMeans(evi12[,6:11], na.rm=TRUE)
+            message("Determining rice pixels.", appendLF=TRUE)
+            ricet1 <- max5>=max12
+            ricet2 <- ave611>=0.2
+            rice <- fld[fpix] & ricet1 & ricet2
+            counts[i-st+1] <- length(which(rice==1))
+            rvals <- rep(NA,ncell(fld))
+            rvals[fpix] <- as.numeric(rice)
+            overall <- rowSums(cbind(overall,rvals), na.rm=TRUE)
+            message("Writing rice map to disk.", appendLF=TRUE)
+            ricegrid <- setValues(fld,rvals)
+            writeRaster(ricegrid, filename=paste(outpath, paste(vfiles$tile[i+1], "_", y, "_", gsub(" ", 0, format(vfiles$doy[i+1], width=3)), "_rice.tif", sep=""), sep="/"), format=outformat, options=c("COMPRESS=LZW", "TFW=YES"), datatype="INT2S", overwrite=TRUE)
+            #writeGDAL(ricegrid, paste(outpath, paste(vfiles$tile[i+1], "_", y, "_", gsub(" ", 0, format(vfiles$doy[i+1], width=3)), "_rice.tif", sep=""), sep="/"), options=c("COMPRESS=LZW", "TFW=YES"), type="Int16")
+            message(paste("Done.", counts[i-st+1],"rice pixels found."), appendLF=TRUE)
+            rm(ricegrid,rice, max5, max12, ave611, ricet1, ricet2, rvals,evi12)
+            gc(verbose=FALSE)
+        }
+        totalrice <- setValues(fld,overall)
+        writeRaster(totalrice, filename=paste(outpath,paste(y,"totalrice.tif", sep="_"),sep="/"), format=outformat, options=c("COMPRESS=LZW", "TFW=YES"), datatype="INT2S", overwrite=TRUE)
+        #writeGDAL(totalrice, paste(outpath,paste(y,"totalrice.tif", sep="_"),sep="/"), options=c("COMPRESS=LZW", "TFW=YES"), type="Int16")
+        ricepix <- as.numeric(overall>0)
+        riceofyear <- setValues(fld, ricepix)
+        writeRaster(riceofyear, filename=paste(outpath,paste(y,"riceofyear.tif", sep="_"),sep="/"), format=outformat, options=c("COMPRESS=LZW", "TFW=YES"), datatype="INT2S", overwrite=TRUE)
+        #writeGDAL(riceofyear, paste(outpath,paste(y,"riceofyear.tif", sep="_"),sep="/"), options=c("COMPRESS=LZW", "TFW=YES"), type="Int16")
+        if (!is.null(dev.list())) x11()
+        
+        barplot(counts, names.arg=vfiles$doy[st:en+1], main="Count of identified rice pixels per DOY")
+        savePlot(filename=paste(outpath,paste(y,"npix_riceplot.png", sep="_"),sep="/"), type="png")    
+         
+    }
+    
+}

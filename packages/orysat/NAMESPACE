@@ -1,0 +1,5 @@
+import(rgdal)
+import(RemoteSensing)
+import(reticulate)
+#import(parallel)
+exportPattern("^[[:alpha:]]+")

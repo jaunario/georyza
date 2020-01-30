@@ -1,4 +1,0 @@
-import(rgdal)
-import(RemoteSensing)
-import(parallel)
-exportPattern("^[[:alpha:]]+")

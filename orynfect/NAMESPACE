@@ -1,2 +1,0 @@
-importFrom("graphics", plot)
-exportPattern("^[^\\.]")
