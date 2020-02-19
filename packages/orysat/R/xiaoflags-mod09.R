@@ -16,7 +16,7 @@ xiaoflags.snow <- function(ndsi, nir) {
   #	res <- 
   #	res[(nir > 0.11) & (ndsi > 0.40)] <- 0
   #	res[is.na(res)] <- -15
-  return(!((nir > 0.11) & (ndsi > 0.40)))
+  return((nir > 0.11) & (ndsi > 0.40))
 }
 
 xiaoflags.snowadj <- function(ndsi, green, nir) {

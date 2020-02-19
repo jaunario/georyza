@@ -23,14 +23,12 @@ pheno.cropstart <- function(){
 #     20000+idx2*100+idx1 - 2 Seasons of Rice
 #     3000000+idx3*10000+idx2*100+idx1 - 3 Seasons of Rice
 
-rice.Xiao_v1 <- function(pixel.data, out.rice=TRUE, flood.fun=flooded1, evi.floodmax=0.25, evi.ricemax=-1, evi.halfricemax=-1, rnr.only=FALSE, data.interval=8, crop.duration=120){
-
-  rice <- 0
+# TODO: My interpretation of the Xiao method, with some improvements 
+rice.Xiao_v1 <- function(evi, lswi, ndvi=NULL, out.rice=TRUE, flood.fun=flooded1, evi.floodmax=0.25, evi.ricemax=-1, evi.halfricemax=-1, rnr.only=FALSE, data.interval=8, crop.duration=120){
   
-  # Check data requirements based on column names
-  if(sum(colnames(pixel.data) %in% c("lswi", "ndvi", "evi"))<3){
-    stop("Missing required data")  
-  }    
+  rice <- 0
+  if(is.null(ndvi)) ndvi <- evi
+  if(length(evi)!=length(lswi)|length(lswi)!=length(ndvi)) stop("Unequal number of data points")
   #evi.ricemax=-1
   #evi.halfricemax=-1
   evi.ricemax <- ifelse(evi.ricemax==0, 0.75, evi.ricemax) 
@@ -40,18 +38,17 @@ rice.Xiao_v1 <- function(pixel.data, out.rice=TRUE, flood.fun=flooded1, evi.floo
   pts.cd <- ceiling(crop.duration/data.interval) # No of data points to reach crop duration
   
   # Expected latest possible start of season based on crop duration specified
-  flooding.last <- nrow(pixel.data)-pts.cd
-  
+  flooding.last <- length(evi)-pts.cd
   # Determine rice and non-rice properties, if necessary, on the pixel data
   
   # Find flooding. Normal lowland rice fields are initially flooded
-  flooding <- which(flood.fun(lswi=pixel.data[1:flooding.last,"lswi"], ndvi=pixel.data[1:flooding.last,"ndvi"], evi=pixel.data[1:flooding.last,"evi"]) &
-                    pixel.data[1:flooding.last,"evi"] <= evi.floodmax)
-  evi.flood <- pixel.data[flooding,"evi"]
-  
+  flooding <- which(flood.fun(lswi=lswi[1:flooding.last], ndvi=ndvi[1:flooding.last], evi=evi[1:flooding.last]) &
+                      evi[1:flooding.last] <= evi.floodmax & evi[1:flooding.last] > -3)
+  evi.flood <- evi[flooding]
+
   if (length(flooding)>0){
     # Get evi from start of flooding upto crop duration
-    evi.cropdur <- matrix(pixel.data[sapply(flooding, FUN=seq, length.out=pts.cd), "evi"],ncol=pts.cd, byrow=TRUE)
+    evi.cropdur <- matrix(evi[sapply(flooding, FUN=seq, length.out=pts.cd)],ncol=pts.cd, byrow=TRUE)
     
     #Compute for evi.rice max if < 0
     if(evi.ricemax < 0) evi.ricemax <- apply(evi.cropdur, 1, max, na.rm = TRUE)
@@ -96,14 +93,10 @@ rice.Xiao_v1 <- function(pixel.data, out.rice=TRUE, flood.fun=flooded1, evi.floo
           rice <- sum(10^((1:length(flooding)-1)*3)*flooding+(10^(c(2,5,8)[1:length(flooding)])*(1:length(flooding))))
         }
       }
+      if(length(flooding)==0) rice <- 0
     }
   }
   return(rice)
-}
-
-# TODO: My interpretation of the Xiao method, with some improvements 
-.Xiao_v2 <- function(){
-  
 }
 
 # TODO: Quadratic Regression Based Method
@@ -112,7 +105,14 @@ rice.Xiao_v1 <- function(pixel.data, out.rice=TRUE, flood.fun=flooded1, evi.floo
 
 
 optical.rice <- function(vi, h20i, season_start=1, season_end=1){
-	
+# General algorithm for finding rice involves 2 steps.
+#   1. Find flooding in the field 
+#   2. See if vegetation follows a sudden increase
+#
+# A more elaborate analysis is to look at the signature from the flooding until 
+# the expected end of cropping, characterized by a decrease in vegetation index
+    
+  	
 }
 
 

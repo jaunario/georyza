@@ -1,7 +1,7 @@
 Package: orysat
 Type: Package
 Title: Satellite-based rice mapping package
-Version: 0.0.4
+Version: 0.0.5
 Date: 2018-04-01
 Depends: R (>= 3.0), RemoteSensing, reticulate, rgdal, curl 
 #Suggests: parallel

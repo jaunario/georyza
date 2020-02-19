@@ -33,7 +33,7 @@ stateflags.cloudShadow <- function (state_500m) {
 
 # Water mask
 stateflags.water <- function(state_500m){    
-  return(modis.sqa500c(state_500m)!=1)
+  return(modis.sqa500c(state_500m))
 }
 
 #Internal Snow mask
