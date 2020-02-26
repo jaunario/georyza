@@ -49,9 +49,9 @@ rice.Xiao_v1 <- function(evi, lswi, ndvi=NULL, out.rice=TRUE, flood.fun=flooded1
   if (length(flooding)>0){
     # Get evi from start of flooding upto crop duration
     evi.cropdur <- matrix(evi[sapply(flooding, FUN=seq, length.out=pts.cd)],ncol=pts.cd, byrow=TRUE)
-    
+    evi.maxperiod <- matrix(evi.cropdur[,6:pts.cd],ncol=pts.cd-5, byrow=TRUE)
     #Compute for evi.rice max if < 0
-    if(evi.ricemax < 0) evi.ricemax <- apply(evi.cropdur, 1, max, na.rm = TRUE)
+    if(evi.ricemax < 0) evi.ricemax <- apply(evi.maxperiod, 1, max, na.rm = TRUE)
     if(evi.halfricemax < 0)  evi.halfricemax <- evi.ricemax/2
     
     # find flooding if no increase within cropping duration
