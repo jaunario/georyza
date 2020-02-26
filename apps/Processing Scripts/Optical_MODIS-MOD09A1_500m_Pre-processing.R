@@ -46,7 +46,7 @@ if(SAVE_MASKS & !dir.exists(MASK_DIR)) dir.create(MASK_DIR)
 
 library(orysat)
 library(manipulateR)
-python.start()
+pylibs.start(python="~/../miniconda3", required=TRUE)
 
 # List required images for the specified year and method
 # TODO: Make a function to create this using a function
@@ -74,8 +74,6 @@ for(i in 1:nrow(inv.hdffiles)){
   
   if(!exists("pixels.toanalyze")){
     baseraster <- raster(mdata.mod09@extent, ncol=mdata.mod09@ncols, nrow=mdata.mod09@nrows, crs=mdata.mod09@projection)
-    prj <- unlist(strsplit(projection(baseraster)," "))
-    projection(baseraster) <- sub(grep("\\+R", prj[5], value = TRUE), paste0(c("+a", "+b"), sub("\\+R", "", grep("\\+R", prj[5], value = TRUE)), collapse = " "), projection(baseraster))
     pixels.toanalyze <- which(stateflags.water(mdata.mod09@imgvals$state_500m) %in% 1:3)
   } 
   mdata.mod09@imgvals <- mdata.mod09@imgvals[pixels.toanalyze,]
@@ -172,26 +170,4 @@ timeen.indices <- Sys.time()
 timeen.indices-timest.indices
 toremove <- ls()[!ls() %in% c("MODIS_HOME", "required.acqdates", "INDICES_DIR", "METHOD", "PRODUCTS", "TILE", "YEAR")]
 rm(list=toremove)
-source('~/GitHub/georyza/apps/Processing Scripts/orysat_Xiao-v1.1.R')
-
-# xx[] <- mdata.LCLU@imgvals$LC_Type1
-# rr <- gg <- bb <- raster(baseraster)
-# rr[pixels.toanalyze] <- mdata.mod09@imgvals$red
-# gg[pixels.toanalyze] <- mdata.mod09@imgvals$green
-# bb[pixels.toanalyze] <- mdata.mod09@imgvals$blue
-# rgb <- stack(rr,gg,bb)
-# 
-# plotRGB(rgb, stretch="lin")
-# zz <- raster(xx)
-# zz[pixels.toanalyze] <- 1
-# 
-# plotRGB(rgb, stretch="lin")
-# plot(cld, add=T)
-# 
-# others <- raster(baseraster)
-# others[pixels.toanalyze] <- mdata.indices@imgvals$NDVI
-# #others[!others[]] <- NA
-# #others[others[]>=1] <- 1
-# 
-# plotRGB(rgb, stretch="lin")
-# plot(others)
+source('~/GitHub/georyza/apps/Processing Scripts/orysat_Xiao.R')

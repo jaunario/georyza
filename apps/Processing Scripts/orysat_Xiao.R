@@ -22,7 +22,7 @@ approx_int <- function(...){
 
 # Extract data
 message("ORYSAT-", METHOD, ": Listing files.")
-filelist.index <- dir(INDICES_DIR, pattern = paste0(PRODUCTS, ".", TILE, ".*.tif$"), recursive = TRUE, full.names = TRUE)
+filelist.index <- dir(INDICES_DIR, pattern = paste0(PRODUCTS, ".", TILE, ".*.tif$"), full.names = TRUE)
 inv.idxfiles <-  inventory.modis(filelist.index, modisinfo = c("product", "zone", "acqdate", "band"), file.ext = "tif")
 inv.idxfiles <- inv.idxfiles[inv.idxfiles$acqdate %in% required.acqdates,]
 inv.idxfiles <- inv.idxfiles[order(inv.idxfiles$band, inv.idxfiles$acqdate),]
@@ -61,9 +61,8 @@ rm(na.maxlen, stk.ndvi)
 
 pixels.toprocess <- which(is.na(maskraster[]))
 mat.ndvi <- mat.ndvi[pixels.toprocess,]
-mat.ndvi <- apply(mat.ndvi, 1, approx_int, x=1:ncol(mat.ndvi), xout=1:ncol(mat.ndvi))
-#mat.ndvi <- as.data.frame(mat.ndvi)
-#mat.ndvi <- mat.ndvi[,grepl("y", colnames(mat.ndvi))]
+mat.ndvi <- apply(mat.ndvi, 1, approx_int, x=1:ncol(mat.ndvi), xout=1:ncol(mat.ndvi)) # Output is a dataframe of time-series ndvi values where pixels are at the columns
+
 
 message("ORYSAT-", METHOD, ": Identifying snow.")
 snw.maxlen <- apply(mat.ndvi == -32767, 2, maxlen.condition)
@@ -86,6 +85,7 @@ mat.lswi <- raster::values(stk.lswi)
 mat.lswi <- mat.lswi[pixels.toprocess,]
 mat.lswi <- apply(mat.lswi, 1, approx_int, x=1:ncol(mat.lswi), xout=1:ncol(mat.lswi))
 
+
 # Caching full lswi series
 save(mat.lswi, file="mat_lswi.Rdata")
 
@@ -98,11 +98,10 @@ rm(shrb.count)
 load(paste0("mat_ndvi", YEAR, ".Rdata"))
 
 message("ORYSAT-", METHOD, ": Identifying permanent water.")
-mat.ndvi <- mat.ndvi<1000
-mat.lswi <- mat.ndvi < mat.lswi
-h2o.count <- colSums( mat.ndvi & mat.lswi)
-maskraster[pixels.toprocess[h2o.count>=10]] <- -6
-rm(h2o.count, mat.lswi, mat.ndvi)
+nh2o <- mat.ndvi>=1000 | mat.ndvi >= mat.lswi
+nh2o.count <- apply(nh2o, 2, maxlen.condition)
+maskraster[pixels.toprocess[nh2o.count<15]] <- -6
+rm(nh2o, nh2o.count, mat.lswi, mat.ndvi)
 gc(reset=TRUE)
 potential.rice <- is.na(maskraster[pixels.toprocess])
 
@@ -172,86 +171,3 @@ timeen.proc <- timeen.rice <- Sys.time()
 timedur.rice <- timeen.proc-timest.extract
 
 message("ORYSAT-", METHOD, ": Done. (", round(timedur.rice,2), " ", attr(timedur.rice, "unit"), ") ")
-
-# 
-# # cache full ndvi series
-# save(fill.ndvi, file = "fill_ndvi.Rdata")
-# 
-# message("ORYSAT-", METHOD, ": Identifying forests.")
-# fill.ndvi <- fill.ndvi[grep(YEAR, required.acqdates),]
-# 
-# # cache ndvi series for year of interest, to be loaded for identifying permanent water
-# save(fill.ndvi, file = paste0("fill_ndvi_", YEAR, ".Rdata"))
-# rm(fill.ndvi)
-# 
-# message("ORYSAT-", METHOD, ": Filling LSWI Time Series.")
-# if(APPROX_BY_JULIANDAY){
-#   fill.lswi <- mapply(approx, as.data.frame(mat.lswi), x=as.data.frame(mat.jday),xout=as.data.frame(t(as.Date(required.acqdates, "A%Y%j"))))
-# } else {
-#   fill.lswi <- as.data.frame(apply(mat.lswi, 2, approx, x=1:nrow(mat.lswi), xout=1:nrow(mat.lswi)))
-# }
-# rm(mat.lswi, stk.lswi)
-# fill.lswi <- unlist(fill.lswi[seq(2, length(fill.lswi), by=2)])  
-# fill.lswi <- matrix(fill.lswi, nrow=length(required.acqdates))
-# timeen.lswi <- Sys.time()
-# timeen.lswi-timest.lswi
-# 
-# 
-# # cache full lswi series
-# save(fill.lswi, file = "fill_lswi.Rdata")
-# 
-# message("ORYSAT-", METHOD, ": Identifying shrubs.")
-# fill.lswi <- fill.lswi[grep(YEAR, required.acqdates),]
-# 
-# message("ORYSAT-", METHOD, ": Identifyingpermanent water.")
-# load(paste0("fill_ndvi_", YEAR, ".Rdata"))
-# 
-# snw.maxlen <- apply(fill.ndvi == -3.2767, 2, maxlen.condition)
-# maskraster[interp.index[snw.maxlen>3]] <- -7
-# # na.count <- colSums(is.na(mat.ndvi), na.rm=TRUE)
-# rm(fill.ndvi, fill.lswi, snw.maxlen)
-# gc(reset = TRUE)
-# 
-# 
-# timest.rice <- Sys.time()
-# check.rice <- pixels.toprocess[is.na(maskraster[pixels.toprocess])]
-# 
-# 
-# 
-# mat.jday <- mat.jday[,check.rice]
-# message("ORYSAT-", METHOD, ": Filling EVI Time Series.")
-# timest.evi <- Sys.time()
-# if(APPROX_BY_JULIANDAY){
-#   fill.evi <- mapply(approx, as.data.frame(mat.evi), x=as.data.frame(mat.jday),xout=as.data.frame(t(as.Date(required.acqdates, "A%Y%j"))))
-# } else {
-#   fill.evi <- as.data.frame(apply(mat.evi, 2, approx, x=1:nrow(mat.evi), xout=1:nrow(mat.evi)))
-# }
-# 
-# # if(APPROX_BY_JULIANDAY){
-# #   fill.evi <- mapply(approx, as.data.frame(mat.evi), x=as.data.frame(adj.jday),xout=as.data.frame(t(as.Date(required.acqdates, "A%Y%j"))))
-# #   fill.evi <- as.data.frame(matrix(unlist(fill.evi),nrow=length(required.acqdates))[,-seq(1, length(fill.evi2), by=2)])  
-# # } else {
-# #   fill.evi <- as.data.frame(apply(mat.evi, 2, approx, x=1:nrow(mat.evi), xout=1:nrow(mat.evi)))
-# #   fill.evi <- fill.evi[,grep("y",colnames(fill.evi))]
-# # }
-# rm(mat.evi)
-# fill.evi <- matrix(unlist(fill.evi[seq(2, length(fill.evi), by=2)]), nrow=length(required.acqdates))  
-# fill.evi <- fill.evi/10000
-# 
-# timeen.evi <- Sys.time()
-# timeen.evi-timest.evi
-# 
-# message("ORYSAT-", METHOD, ": Identifying rice pixels.")
-# 
-# 
-# load("fill_ndvi.Rdata")
-# fill.ndvi <- fill.ndvi[,check.rice]
-# 
-# load("fill_lswi.Rdata")
-# fill.lswi <- fill.lswi[,check.rice]
-# 
-# # for(i in 1:length(check.rice)){
-# #   pixel <- interp.index[check.rice[i]]
-# #   cell.ref$rice[pixel] <- rice.Xiao_v1(evi=fill.evi[,pixel], lswi=fill.lswi[,pixel], ndvi = fill.ndvi[,pixel])
-# # }
-# 
