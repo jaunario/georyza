@@ -21,7 +21,7 @@ LAYERS_TOFILL = 1:4
 
 # METHOD SETTINGS
 METHOD     = "xiao-v1"
-YEAR       = 2015
+YEAR       = 2014
 
 # PROCESS OPTIONS
 SAVE_MASKS    = TRUE
@@ -87,7 +87,7 @@ for(i in 1:nrow(inv.hdffiles)){
   # Compute indices required for the analysis
   mdata.indices <- modis.data(mdata.mod09)
   mdata.indices@imgvals <- modis.compute(mdata.mod09, funlist = indices)
-  mdata.indices@imgvals$julianday <- mdata.mod09@imgvals$julianday
+  mdata.indices@imgvals$actualdate <- as.vector(dateFromDoy(mdata.mod09@imgvals$julianday, year=as.numeric(substr(mdata.mod09@acqdate,2,5))))
   
   # Includes cloud, internal cloud, blue-based cloud
   fillable.cloud <- (stateflags.cloud(mdata.mod09@imgvals$state_500m) + stateflags.internalCloud(mdata.mod09@imgvals$state_500m))*0.5 +  xiaoflags.cloud(mdata.mod09@imgvals$blue, scale=1)*2  
@@ -102,15 +102,11 @@ for(i in 1:nrow(inv.hdffiles)){
   for(j in 1:ncol(mdata.indices@imgvals)){
     fname <- paste0(INDICES_DIR,"/", fname.base, ".", colnames(mdata.indices@imgvals)[j],".tif")
     if(file.exists(fname)) next
-    thislayer <- baseraster
     
-    if(colnames(mdata.indices@imgvals)[j]=="julianday"){
-      actualdates <- as.vector(dateFromDoy(mdata.indices@imgvals[,j], year=as.numeric(substr(mdata.mod09@acqdate,2,5))))
-      values(thislayer) <- actualdates
-      colnames(mdata.indices@imgvals)[j] <- "actualdate"
-    } else {
-      values(thislayer) <- mdata.indices@imgvals[,j]  
-      
+    thislayer <- baseraster
+    values(thislayer) <- mdata.indices@imgvals[,j]
+    
+    if(colnames(mdata.indices@imgvals)[j]!="actualdate"){
       if(DO_SPATFILL){
         message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i],": Trying to fill ", indices[j])
         thislayer <- focal(thislayer, matrix(rep(1,9),ncol=3), fun=focal.mean, NAonly=TRUE)

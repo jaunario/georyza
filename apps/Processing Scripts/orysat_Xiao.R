@@ -150,7 +150,7 @@ rst.rice[pixels.toprocess[potential.rice]] <- mapply(FUN=rice.Xiao_v1, evi=fill.
 
 message("ORYSAT-", METHOD, ": Writing to disk.")
 rst.lc <- writeRaster(rst.lc, paste0(paste("LANDCOVER", METHOD, TILE, YEAR, sep="_"),".tif"), datatype="INT4S", overwrite=TRUE)
-rst.rice <- writeRaster(rst.rice, paste0(paste("RiceMapFin", METHOD, TILE, YEAR, ifelse(APPROX_BY_JULIANDAY,"ABJ","ACQ"), sep="_"),".tif"), datatype="INT4S", overwrite=TRUE)
+rst.rice <- writeRaster(rst.rice, paste0(paste("RiceMap", METHOD, TILE, YEAR, ifelse(APPROX_BY_JULIANDAY,"ABJ","ACQ"), sep="_"),".tif"), datatype="INT4S", overwrite=TRUE)
 timeen.proc <- timeen.rice <- Sys.time()
 timedur.rice <- timeen.proc-timest.extract
 
