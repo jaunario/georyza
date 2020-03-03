@@ -43,15 +43,14 @@ rice.Xiao_v1 <- function(evi, lswi, ndvi=NULL, out.rice=TRUE, flood.fun=flooded1
   
   # Find flooding. Normal lowland rice fields are initially flooded
   flooding <- which(flood.fun(lswi=lswi[1:flooding.last], ndvi=ndvi[1:flooding.last], evi=evi[1:flooding.last]) &
-                      evi[1:flooding.last] <= evi.floodmax & evi[1:flooding.last] > -3)
+                      evi[1:flooding.last] <= evi.floodmax & evi[1:flooding.last] >= -1)
   evi.flood <- evi[flooding]
 
   if (length(flooding)>0){
     # Get evi from start of flooding upto crop duration
     evi.cropdur <- matrix(evi[sapply(flooding, FUN=seq, length.out=pts.cd)],ncol=pts.cd, byrow=TRUE)
-    evi.maxperiod <- matrix(evi.cropdur[,6:pts.cd],ncol=pts.cd-5, byrow=TRUE)
     #Compute for evi.rice max if < 0
-    if(evi.ricemax < 0) evi.ricemax <- apply(evi.maxperiod, 1, max, na.rm = TRUE)
+    if(evi.ricemax < 0) evi.ricemax <- apply(evi.cropdur, 1, max, na.rm = TRUE)
     if(evi.halfricemax < 0)  evi.halfricemax <- evi.ricemax/2
     
     # find flooding if no increase within cropping duration
@@ -68,8 +67,9 @@ rice.Xiao_v1 <- function(evi, lswi, ndvi=NULL, out.rice=TRUE, flood.fun=flooded1
       evi.fldp40 <- matrix(evi.cropdur[,(1:pts.40d)+1], nrow = nrow(evi.cropdur))
       rice.potential <- which(rowSums(evi.fldp40>=evi.halfricemax, na.rm=TRUE)>1)
       
-      # TODO : if too many rice check evi.ricemax should be after 40days
+      # TODO : add option if too many rice check evi.ricemax should be after 40days
       # evi.after40 <- matrix(evi.cropdur[,(pts.40d+1):ncol(evi.cropdur)], nrow = nrow(evi.cropdur))
+      
       # If there is rice.potential
       if(length(rice.potential)>0 & rnr.only){
         rice <- 1

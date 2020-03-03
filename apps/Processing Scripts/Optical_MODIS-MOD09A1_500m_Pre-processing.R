@@ -4,7 +4,8 @@
 
 
 # DIRECTORY SETTINGS
-MODIS_HOME = "C:/Data/MODIS/v006"
+MODIS_HOME = "C:/Data/MODIS"
+
 WORKSPACE  = "C:/WORKSPACE/Orysat"
 INDICES_DIR = paste0(WORKSPACE, "/indices")
 MASK_DIR    = paste0(WORKSPACE, "/mask")
@@ -12,18 +13,19 @@ MASK_DIR    = paste0(WORKSPACE, "/mask")
 # MODIS-SPECIFIC SETTINGS
 TILE        = "h26v06"
 PRODUCTS    = "MOD09A1"
+PROD_VER    = 6
 
 LAYERS        = c(1:7,12,13)
-LAYER_NAMES   = c("red", "nir", "blue", "green", "nir2","swir1", "swir", "state_500m", "julianday")
+LAYER_NAMES   = c("red", "nir", "blue", "green", "nir2","swir", "swir1", "state_500m", "julianday")
 LAYERS_TOFILL = 1:4
 
 # METHOD SETTINGS
 METHOD     = "xiao-v1"
-YEAR       = 2014
+YEAR       = 2015
 
 # PROCESS OPTIONS
-SAVE_MASKS = TRUE
-DO_FILL    = FALSE # Perform spatial-filling using focal
+SAVE_MASKS    = TRUE
+DO_SPATFILL   = TRUE # Perform spatial-filling using focal
 SETTINGS_FILE = ""
 
 
@@ -56,13 +58,18 @@ required.acqdates <- paste("A",c(paste(YEAR-1,sprintf("%03g", ACQDOYS)[(length(A
                                  paste(YEAR+1,sprintf("%03g",ACQDOYS)[1:11], sep="")),   # SUCCEEDING YEAR
                            sep="")
 
-indices <- c("ndvi", "evi", "lswi", "mndwi", "ndsi")
+indices <- c("ndvi", "evi", "lswi", "ndsi", "mndwi")
 
 message("ORYSAT: Creating inventory required MODIS files in ", MODIS_HOME)
-filelist.modis <- dir(paste(MODIS_HOME, PRODUCTS, TILE, sep="/"), pattern = paste0(PRODUCTS, ".*.", TILE, ".*.hdf$"), recursive = TRUE, full.names = TRUE)
+filelist.modis <- dir(paste(MODIS_HOME, paste0("v", PROD_VER),PRODUCTS, TILE, sep="/"), pattern = paste0(PRODUCTS, ".*.", TILE, ".*.hdf$"), recursive = TRUE, full.names = TRUE)
 inv.hdffiles <-  inventory.modis(filelist.modis, modisinfo = c("product", "acqdate", "zone", "version", "proddate"), file.ext = "hdf")
 inv.hdffiles <- inv.hdffiles[inv.hdffiles$acqdate %in% required.acqdates,]
 
+rst.dem <- raster(dir(paste0(MODIS_HOME, "/dem"), pattern=TILE, full.names = TRUE, recursive=TRUE))
+rst.slp <- raster(dir(paste0(MODIS_HOME, "/slp"), pattern=TILE, full.names = TRUE, recursive=TRUE))
+
+rst.demmask <- (rst.dem<=2000 | rst.slp<=2)
+rst.demmask[rst.demmask[]==0] <- NA
 
 timest.indices <- Sys.time()
 for(i in 1:nrow(inv.hdffiles)){
@@ -72,102 +79,84 @@ for(i in 1:nrow(inv.hdffiles)){
   if(nrow(mdata.mod09@imgvals)==0) stop("not read") #mdata.mod09 <- modis.readHDF(inv.hdffiles$filename[i], layer = LAYERS)
   colnames(mdata.mod09@imgvals) <- LAYER_NAMES
   
-  if(!exists("pixels.toanalyze")){
+  if(!exists("baseraster")){
     baseraster <- raster(mdata.mod09@extent, ncol=mdata.mod09@ncols, nrow=mdata.mod09@nrows, crs=mdata.mod09@projection)
-    pixels.toanalyze <- which(stateflags.water(mdata.mod09@imgvals$state_500m) %in% 1:3)
   } 
-  mdata.mod09@imgvals <- mdata.mod09@imgvals[pixels.toanalyze,]
-
   
   message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i],": Computing indices.")
   # Compute indices required for the analysis
   mdata.indices <- modis.data(mdata.mod09)
   mdata.indices@imgvals <- modis.compute(mdata.mod09, funlist = indices)
+  mdata.indices@imgvals$julianday <- mdata.mod09@imgvals$julianday
   
-  # Includes cloud, internal cloud, blue-based cloud and snow
+  # Includes cloud, internal cloud, blue-based cloud
   fillable.cloud <- (stateflags.cloud(mdata.mod09@imgvals$state_500m) + stateflags.internalCloud(mdata.mod09@imgvals$state_500m))*0.5 +  xiaoflags.cloud(mdata.mod09@imgvals$blue, scale=1)*2  
-  fillable.snow <- xiaoflags.snow(mdata.indices@imgvals$NDSI,mdata.mod09@imgvals$nir) + stateflags.snow(mdata.mod09@imgvals$state_500m)   
   
   # Fill suspected cloudy and snow pixels
-  message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i],": Removing data from cloudy and snowy pixels.")
+  message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i],": Removing data from cloud pixels.")
   mdata.indices@imgvals[which(fillable.cloud>.5), LAYERS_TOFILL] <- NA
-  mdata.indices@imgvals[which(fillable.snow>0), LAYERS_TOFILL] <- -3.2767 
   
-  if(DO_FILL){
-    for(j in 1:length(LAYERS_TOFILL)){
-      message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i],": Trying to fill ", indices[j])
-      thislayer <- baseraster
-      thislayer[pixels.toanalyze] <- mdata.indices@imgvals[,j]
-      thislayer <- focal(thislayer, matrix(rep(1,9),ncol=3), fun=focal.mean, NAonly=TRUE)
-      mdata.indices@imgvals[tofill,j] <- thislayer[pixels.toanalyze[tofill]]
-      rm(thislayer)
-    }
-  }
+  flag.snow <- xiaoflags.snow(mdata.indices@imgvals$NDSI,mdata.mod09@imgvals$nir) + stateflags.snow(mdata.mod09@imgvals$state_500m)   
   
-  mdata.indices@imgvals <- mdata.indices@imgvals[,LAYERS_TOFILL]
-  mdata.indices@imgvals$julianday <- mdata.mod09@imgvals$julianday
-  gc(reset = TRUE)
-  
-  # Save indices as GeoTiff raster files,
   fname.base <- paste(mdata.indices@product, mdata.indices@zone, mdata.indices@acqdate, sep=".")
   for(j in 1:ncol(mdata.indices@imgvals)){
-    message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i],": Writing ", colnames(mdata.indices@imgvals)[j], " to disk.") 
+    fname <- paste0(INDICES_DIR,"/", fname.base, ".", colnames(mdata.indices@imgvals)[j],".tif")
+    if(file.exists(fname)) next
     thislayer <- baseraster
     
-    if(colnames(mdata.indices@imgvals)[j]!="julianday"){
-      if(max(mdata.indices@imgvals[,j], na.rm=TRUE)>3.2767) stop("CHANGE DATATYPE")
-      thislayer[pixels.toanalyze] <- round(mdata.indices@imgvals[,j],4)*10000
-    } else {
-      thislayer[pixels.toanalyze] <- dateFromDoy(mdata.indices@imgvals[,j], year=as.numeric(substr(mdata.mod09@acqdate,2,5)))
+    if(colnames(mdata.indices@imgvals)[j]=="julianday"){
+      actualdates <- as.vector(dateFromDoy(mdata.indices@imgvals[,j], year=as.numeric(substr(mdata.mod09@acqdate,2,5))))
+      values(thislayer) <- actualdates
       colnames(mdata.indices@imgvals)[j] <- "actualdate"
+    } else {
+      values(thislayer) <- mdata.indices@imgvals[,j]  
+      
+      if(DO_SPATFILL){
+        message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i],": Trying to fill ", indices[j])
+        thislayer <- focal(thislayer, matrix(rep(1,9),ncol=3), fun=focal.mean, NAonly=TRUE)
+      }
+      
+      message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i],": Flagging snow.")
+      thislayer[which(flag.snow>0 & !is.na(thislayer[]))] <- -3.2767
+      
+      if(maxValue(thislayer)>3.2767 | minValue(thislayer) < -3.2767) stop("CHANGE DATATYPE")
+      thislayer <- round(thislayer,4)*10000
     }
-    fname <- paste0(INDICES_DIR,"/", fname.base, ".", colnames(mdata.indices@imgvals)[j],".tif")
-    if(!file.exists(fname)){
-      thislayer <- writeRaster(thislayer, 
-                               filename = fname,
-                               options = c("COMPRESS=LZW"), datatype="INT2S")    }
     
+    thislayer <- mask(thislayer,rst.demmask)
+    message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i],": Writing ", colnames(mdata.indices@imgvals)[j], " to disk.")
+    thislayer <- writeRaster(thislayer, 
+                               filename = fname,
+                               options = c("COMPRESS=LZW"), datatype="INT2S")    
     rm(thislayer)
   }
+  rm(mdata.indices,mdata.mod09)
+  gc(reset = TRUE)
   
   if(SAVE_MASKS){
-    message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i], ": Saving cloud layer.")
+    message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i], ": Saving mask.")
     MASK_DIR <- "./mask"
     if(!dir.exists(MASK_DIR)) dir.create(MASK_DIR)
     
-    cld <- raster(baseraster)
-    cld[pixels.toanalyze] <- fillable.cloud
-    cld[cld[]<=0.5] <- NA
-    cld[cld[]>0.5] <- 1
-    fname <- paste0(MASK_DIR,"/", fname.base, ".CLOUD.tif")
+    rst.mask <- (rst.dem>2000 | rst.slp>2)            # High elevation/ steep slope
+    rst.mask[fillable.cloud>0.5 & rst.mask[]==0] <- 2 # Cloud 
+    rst.mask[flag.snow>0 & rst.mask[]==0] <- 3        # Snow
+    fname <- paste0(MASK_DIR,"/", fname.base, ".PREPROCMASK.tif")
     if(!file.exists(fname)){
-      cld <- writeRaster(cld, filename = fname,
+      rst.mask <- writeRaster(rst.mask, filename = fname,
                          options = c("COMPRESS=LZW"), overwrite=TRUE, datatype="INT1U")
     }
-        
-    if(length(fillable.snow)>0){
-      snw <- raster(baseraster)
-      snw[pixels.toanalyze] <- fillable.snow
-      snw[snw[]<=0] <- NA
-      snw[snw[]>0] <- 1
-      fname <- paste0(MASK_DIR,"/", fname.base, ".SNOW.tif")
-      if(!file.exists(fname)){
-        snw <- writeRaster(snw, filename = fname,
-                           options = c("COMPRESS=LZW"), datatype="INT1U")
-      }
-      
-    }
-    
   }  
-  rm(mdata.indices, mdata.mod09)
+  rm(rst.mask)
   gc(reset=TRUE)
   en <- Sys.time()
   aproctime <- en-st
   message("ORYSAT-", METHOD,",", inv.hdffiles$acqdate[i], ": Done. (", round(aproctime,2), " ", attr(aproctime, "unit"), ", ", i, " of ", nrow(inv.hdffiles), "). ")
 
 }
+
 timeen.indices <- Sys.time()
 timeen.indices-timest.indices
 toremove <- ls()[!ls() %in% c("MODIS_HOME", "required.acqdates", "INDICES_DIR", "METHOD", "PRODUCTS", "TILE", "YEAR")]
 rm(list=toremove)
-source('~/GitHub/georyza/apps/Processing Scripts/orysat_Xiao.R')
+#source('~/GitHub/georyza/apps/Processing Scripts/orysat_Xiao.R')
