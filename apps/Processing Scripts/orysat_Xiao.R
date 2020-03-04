@@ -96,6 +96,7 @@ if(APPROX_BY_JULIANDAY){
   mat.jday <- as.data.frame(mat.jday)
 }
 
+message("ORYSAT-", METHOD, ": Adjusting NDVI to equally-spaced acqdate date.")
 if(APPROX_BY_JULIANDAY){
   fill.ndvi <- mapply(approx, y=mat.ndvi, x=mat.jday, xout=data.frame(xout=as.Date(required.acqdates, "A%Y%j")))
   fill.ndvi <- unlist(fill.ndvi[seq(2, length(fill.ndvi), by=2)])
@@ -110,6 +111,7 @@ fill.ndvi <- fill.ndvi/10000
 fill.ndvi <- round(fill.ndvi,4)
 fill.ndvi <- as.data.frame(fill.ndvi)
 
+message("ORYSAT-", METHOD, ": Adjusting LSWI to equally-spaced acqdate date.")
 if(APPROX_BY_JULIANDAY){
   fill.lswi <- mapply(approx, y=mat.lswi, x=mat.jday, xout=data.frame(xout=as.Date(required.acqdates, "A%Y%j")))
   fill.lswi <- unlist(fill.lswi[seq(2, length(fill.lswi), by=2)])
@@ -131,6 +133,7 @@ mat.evi <- mat.evi[pixels.toprocess[potential.rice],]
 mat.evi <- t(mat.evi)
 mat.evi <- as.data.frame(mat.evi)
 
+message("ORYSAT-", METHOD, ": Adjusting EVI to equally-spaced acqdate date.")
 if(APPROX_BY_JULIANDAY){
   fill.evi <- mapply(approx, y=mat.evi, x=mat.jday, xout=data.frame(xout=as.Date(required.acqdates, "A%Y%j")))
   fill.evi <- unlist(fill.evi[seq(2, length(fill.evi), by=2)])
