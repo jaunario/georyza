@@ -3,8 +3,9 @@
 # License GPL3
 # Version 2, March 2009
 
+# TODO: verify if this is NDFI
 # New NDWI using RED band and SWIR2 in MODIS reflectance product
-ndwi7 <- function(red, swir2){
+ndwi7 <- function(red, swir2){ 
   n7 <- (red - swir2) / (red + swir2)
   return(n7)
 }
@@ -12,6 +13,15 @@ ndwi7 <- function(red, swir2){
 dvel <- function(evi, lswi){
 # DVEL: Difference in the Values of EVI and LSWI
   return(evi-lswi)
+}
+
+flood.bythreshold <- function(index.h2o, low.thres= -inf, up.thres=inf, open.circle=TRUE){
+  if(open.circle) {
+    result <- index.h2o>low.thres & index.h2o < up.thres 
+  } else {
+    result <- index.h2o >= low.thres & index.h2o <= up.thres 
+  }
+  return(result)
 }
 
 flooded1 <- function(lswi, ndvi, evi) { 

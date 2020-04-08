@@ -50,6 +50,25 @@ xiaoflags.flooded <- function(evi, ndvi, lswi) {
   return(!((nir > 0.11) & (ndsi > 0.40)))
 }
 
+xiaoflags.rice <- function(evi, evi.ricemax=NULL, evi.halfricemax=NULL, data.interval=8, ricemax.post40=TRUE){
+  pts.40d <- ceiling(40/data.interval) # No of data points to reach 40 days
+  
+  if(is.null(evi.ricemax)){
+    if(ricemax.post40)  evi.ricemax <- max(evi[(pts.40d+1):length(evi)],na.rm = TRUE) else evi.ricemax <- max(evi,na.rm = TRUE)
+  }
+
+  if(is.null(evi.halfricemax)){
+    evi.halfricemax <- evi.ricemax-((evi.ricemax-evi[1])/2)
+  }
+  
+  if(ricemax.post40){
+    result <- sum(evi[1:pts.40d]>=evi.halfricemax)>0 & sum(evi[1:pts.40d]>=evi.ricemax)==0
+  } else {
+    result <- sum(evi[1:pts.40d]>=evi.halfricemax)>0
+  } 
+  return(result)
+}
+
 modis.mask <- function(modvals, masks){
 	#DEPRECATE
     masks <- as.matrix(masks)
