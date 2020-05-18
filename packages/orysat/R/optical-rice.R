@@ -252,6 +252,47 @@ rice.modxiao <- function(ts.vi, ts.flood=NULL, analysis.fun=xiaoflags.rice, data
   return(rice)
 }
 
+rice.itreg <- function(pix.evi, evi.date, dates.covered=NULL, width = 15, increments = 5, eos.evires=0.4, alpha=0.05){
+  if(is.null(dates.covered)) dates.covered <- evi.date
+  idx.starts <- seq(1,length(pix.evi)-width, by=increments)
+  
+  # Prepare segment data frames for lm
+  segments.evi <- as.data.frame(matrix(pix.evi[sapply(idx.starts, FUN=seq, length.out=width)], ncol = length(idx.starts)))
+  segments.dates <- as.data.frame(matrix(evi.date[sapply(idx.starts, FUN=seq, length.out=width)], ncol = length(idx.starts)))
+  segments.list <- mapply(data.frame, x=segments.dates, y=segments.evi, SIMPLIFY = FALSE)
+  
+  # Quadratic regression per segment
+  inc.lm <- lapply(segments.list, FUN=lm, formula=y~poly(x,2))
+  inc.pvals <- sapply(inc.lm, lm.pvalue, lower.tail=FALSE)
+  inc.coef1 <- sapply(inc.lm, lm.coeff)
+  inc.coef2 <- sapply(inc.lm, lm.coeff, coef.id=2)
+  inc.cfpv1 <- sapply(inc.lm, lm.coeff,pvalue=TRUE)
+  inc.cfpv2 <- sapply(inc.lm, lm.coeff, coef.id=2, pvalue=TRUE)
+  
+  # Get segments with significant models, sig. coef1 is positive, sig coef2 is negative 
+  potential.rice <- which(inc.pvals<=alpha & inc.coef1>0 & inc.cfpv1<=alpha & inc.coef2<0 & inc.cfpv2<=alpha)
+  
+  dat.rice <- vector() 
+  
+  last.rice <- 0 #as.numeric(dates.covered[length(dates.covered)])
+  for(i in 1:length(potential.rice)){
+    newx <- data.frame(x=as.numeric(seq(dates.covered[idx.starts[potential.rice[i]]], dates.covered[idx.starts[potential.rice[i]]+width]+7, by="day")))
+    if(last.rice>newx$x[1]) next
+    new.evi <- predict(inc.lm[[potential.rice[i]]], newdata=newx)
+    max.evi <- max(new.evi)
+    eos.evi <- max.evi - ((max.evi-new.evi[1])*eos.evires)
+    rice.sos <- newx$x[1]
+    cnt.rec <- sum(!is.na(segments.evi[,potential.rice[i]]))
+    rsq <- lm.rsquare(inc.lm[[potential.rice[i]]])
+    pkevi <- which(new.evi==max.evi)    
+    # TODO: Verify max.evi as maturity    
+    rice.eos <- newx$x[min(pkevi+min(which(new.evi[pkevi:length(new.evi)]<=eos.evi)),length(newx$x))]
+    dat.rice <- rbind(dat.rice, c(rice.sos, rice.eos, cnt.rec, rsq))
+    last.rice <- rice.eos
+  } 
+  return(dat.rice)
+}
+
 
 rice.ts <- function(ts.vi, ts.date, ts.flood=NULL, analysis.fun=regression.rice, data.interval=8, crop.duration=160, rnr.only=FALSE, ...){
   # Adjustable Xiao-based rice detection algorithm.
