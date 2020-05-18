@@ -6,6 +6,9 @@
 # Version 0.2
 # Licence GPL v3
 # 
+modis.acqdoys <- function(){
+  
+}
 
 modis.productinfo <- function(product){
   # TODO: Create Function that utilizes online LPDAAC Catalog
@@ -44,6 +47,7 @@ modis.readHDF <- function(hdffile, layer=1, verbose=TRUE){
     fillvalue <- as.numeric(obj.sds$GetMetadataItem("_FillValue"))
     scalefactor <- as.numeric(obj.sds$GetMetadataItem("scale_factor"))
     if(length(scalefactor)==0) scalefactor <- 1
+    if(log10(scalefactor)>0) scalefactor <- 1/scalefactor
     
     if(m@projection==""){
       proj.crs <- pyosr$SpatialReference()
