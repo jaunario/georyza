@@ -6,6 +6,9 @@
 # Version 0.2
 # Licence GPL v3
 # 
+
+PROJ.MODIS <- "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +R=6371007.181 +units=m +no_defs"
+
 modis.acqdoys <- function(){
   
 }
@@ -16,7 +19,7 @@ modis.productinfo <- function(product){
   return(modprods[modprods$ShortName==product,])
 }
 
-modis.readHDF <- function(hdffile, layer=1, verbose=TRUE){
+modis.readHDF <- function(hdffile, layer=1, verbose=TRUE, ...){
   if(!exists("pygdal")| !exists("pyosr")) {
     # #stop("Run python start")
     # use_python("~/../AppData/Local/r-miniconda/python")
@@ -24,7 +27,7 @@ modis.readHDF <- function(hdffile, layer=1, verbose=TRUE){
     # for(i in 1:length(list.libs)){
     #   assign(names(list.libs)[i], import(list.libs[[i]]))
     # }
-    python.start()
+    pylibs.start(...)
   }  
   
   info.hdffile <- unlist(strsplit(basename(hdffile),"\\."))

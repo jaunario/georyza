@@ -252,8 +252,81 @@ rice.modxiao <- function(ts.vi, ts.flood=NULL, analysis.fun=xiaoflags.rice, data
   return(rice)
 }
 
+rice.VWIdynamics <- function(vi, wi, flowering.period=7, latest.planting=50, max.evi = 7000, ripening.period=8){
+  result <- vector()
+  #steps
+  # find maxima
+  # Should be consistently increasing from x1(DEFAULT=13 to complete 100 days) acqdates before max evi, and consistently decrease x2(DEFAULT=10 maximum) acqdates after max evi)
+  # test poly reg to get rsquare
+  dx <- diff(vi)
+  trend.asc <- consecutive.groups(which(dx>0))
+  len.asc <- sapply(trend.asc, length)
+  min.asc <- sapply(trend.asc, min)
+  enoughtime_toflower <- len.asc>=flowering.period # Period to flowering (max.evi) is constantly increasing trend for at least 56 days (7 ACQDATES, more lenient than 8)
+  within_timeframe <- min.asc<=latest.planting # Limits the analysis based on latest planting date
+  pot.rice <- which(within_timeframe & enoughtime_toflower)
+  
+  if(length(pot.rice)>0){
+    trend.asc <- trend.asc[pot.rice]    # Limit analysis to segments that passes potentiality
+    min.asc <- min.asc[pot.rice]
+    max.asc <- sapply(trend.asc, max)+1 # get the point of flowering EVI
+    len.asc <- len.asc[pot.rice]
+    maturity.period <- sapply(max.asc, seq, length.out=ripening.period)
+    
+    vi.ripening <- matrix(vi[maturity.period], ncol=ripening.period, byrow = TRUE)
+    dx.ripening <- apply(vi.ripening, 1, diff) # Compute Decrements
+    #trend.desc <- apply(vi.ripening, 1, diff) # Compute Decrements
+    cons.dec5 <- colSums(matrix(dx.ripening[1:5,], nrow=5)<0, na.rm = TRUE) # 
+    is.rice <- cons.dec5>=4
+    if(sum(is.rice)>0){
+      trend.asc <- trend.asc[is.rice]
+      min.asc <- min.asc[is.rice]
+      max.asc <- max.asc[is.rice]
+      
+      len.asc <- len.asc[is.rice]
+      dx.ripening <- matrix(dx.ripening[,is.rice], ncol = sum(is.rice))
+      max_decrement <- apply(matrix(dx.ripening[-(1:3), ], ncol=sum(is.rice)), 2, which.min)+3 # Maximum decrement will indicate harvest date max_decrement <- max_decrement[is.rice]
+      vi.flower <- vi[max.asc]
+      eos <- max.asc + max_decrement
+      sos <- min.asc
+      idx <- mapply(seq, from=as.list(sos), to=as.list(eos), SIMPLIFY = FALSE)
+      vi.season <- mapply("[", data.frame(vi), i=idx, SIMPLIFY = FALSE)
+      vi.mean <- as.numeric(sapply(vi.season, mean, na.rm=TRUE, USE.NAMES = FALSE))
+      vi.sd <- as.numeric(sapply(vi.season, sd, na.rm=TRUE, USE.NAMES = FALSE))
+      
+      wi.season <- mapply("[", data.frame(wi), i=idx, SIMPLIFY = FALSE)
+      wi.mean <- as.numeric(sapply(wi.season, mean, na.rm=TRUE, USE.NAMES = FALSE))
+      wi.sd <- as.numeric(sapply(wi.season, sd, na.rm=TRUE, USE.NAMES = FALSE))
+      # for(i in 1:length(sos)){
+      #   vi.mean <- c(vi.mean, mean(vi[sos[i]:eos[i]]))
+      #   vi.sd <- c(vi.sd, sd(vi[sos[i]:eos[i]]))
+      # }
+      
+      # Additional Points
+      vi.halfflwr <- vi.flower/2 #vi.sos+(vi.flower-vi.sos)/2
+      vi.5 <- matrix(vi[sapply(min.asc, seq, length.out=5)], ncol=5, byrow = TRUE)
+      criterion.xiao  <- rowSums((vi.5 > vi.halfflwr))>0
+      
+      result <- data.frame(sos, eos, flwr=max.asc, vi.sos=vi[sos], vi.eos=vi[eos], vi.flwr=vi.flower, mean.vi=vi.mean, sd.vi=vi.sd, wi.sos=wi[sos], wi.eos=wi[eos], wi.flwr=wi[max.asc], mean.wi=wi.mean, sd.wi=wi.sd, criterion.xiao, met.riceflwrperiod=len.asc>(flowering.period-1))
+      #result <- data.frame(sos, eos, flwr=max.asc, vi.sos=vi[sos], vi.eos=vi[eos], vi.flwr=vi.flower, mean.vi=vi.mean, sd.vi=vi.sd, criterion.xiao, met.riceflwrperiod=len.asc>(flowering.period-1))
+    } 
+  } 
+  return(result)
+}
+
 rice.itreg <- function(pix.evi, evi.date, dates.covered=NULL, width = 15, increments = 5, eos.evires=0.4, alpha=0.05){
-  if(is.null(dates.covered)) dates.covered <- evi.date
+  # Remove NAs
+  missing <- which(is.na(pix.evi))
+  if(length(missing)>0){
+    pix.evi <- pix.evi[-missing]
+    evi.date <- evi.date[-missing]
+  }
+  
+  if(is.null(dates.covered)) {
+    dates.covered <- evi.date
+  } 
+  # TODO: dates.covered will be used to look at a specific window. else statement should remove data outside date.covered
+  
   idx.starts <- seq(1,length(pix.evi)-width, by=increments)
   
   # Prepare segment data frames for lm
@@ -269,30 +342,53 @@ rice.itreg <- function(pix.evi, evi.date, dates.covered=NULL, width = 15, increm
   inc.cfpv1 <- sapply(inc.lm, lm.coeff,pvalue=TRUE)
   inc.cfpv2 <- sapply(inc.lm, lm.coeff, coef.id=2, pvalue=TRUE)
   
-  # Get segments with significant models, sig. coef1 is positive, sig coef2 is negative 
-  potential.rice <- which(inc.pvals<=alpha & inc.coef1>0 & inc.cfpv1<=alpha & inc.coef2<0 & inc.cfpv2<=alpha)
+  # Get segments with significant models, sig coef2 is negative 
+  # sig. coef1 is positive proven need not be true  7-Jul-2020, on h25v06 for 2007
   
+  potential.rice <- which(inc.pvals<=alpha & inc.coef2<0 & inc.cfpv2<=alpha)
   dat.rice <- vector() 
   
-  last.rice <- 0 #as.numeric(dates.covered[length(dates.covered)])
-  for(i in 1:length(potential.rice)){
-    newx <- data.frame(x=as.numeric(seq(dates.covered[idx.starts[potential.rice[i]]], dates.covered[idx.starts[potential.rice[i]]+width]+7, by="day")))
-    if(last.rice>newx$x[1]) next
-    new.evi <- predict(inc.lm[[potential.rice[i]]], newdata=newx)
-    max.evi <- max(new.evi)
-    eos.evi <- max.evi - ((max.evi-new.evi[1])*eos.evires)
-    rice.sos <- newx$x[1]
-    cnt.rec <- sum(!is.na(segments.evi[,potential.rice[i]]))
-    rsq <- lm.rsquare(inc.lm[[potential.rice[i]]])
-    pkevi <- which(new.evi==max.evi)    
-    # TODO: Verify max.evi as maturity    
-    rice.eos <- newx$x[min(pkevi+min(which(new.evi[pkevi:length(new.evi)]<=eos.evi)),length(newx$x))]
-    dat.rice <- rbind(dat.rice, c(rice.sos, rice.eos, cnt.rec, rsq))
-    last.rice <- rice.eos
-  } 
+  if(length(potential.rice)>0){
+    
+    last.rice <- 0 #as.numeric(dates.covered[length(dates.covered)])
+    for(i in 1:length(potential.rice)){
+      if(last.rice>=dates.covered[idx.starts[potential.rice[i]]]) next
+      newx <- data.frame(x=as.numeric(seq(dates.covered[idx.starts[potential.rice[i]]], dates.covered[idx.starts[potential.rice[i]]+width]+7, by="day")))
+      new.evi <- predict(inc.lm[[potential.rice[i]]], newdata=newx)
+      max.evi <- max(new.evi)
+      eos.evi <- max.evi - ((max.evi-new.evi[1])*eos.evires)
+      rice.sos <- newx$x[1]
+      cnt.rec <- sum(!is.na(segments.evi[,potential.rice[i]]))
+      intercept <- lm.coeff(inc.lm[[potential.rice[i]]], coef.id = 0)
+      b1 <- lm.coeff(inc.lm[[potential.rice[i]]], coef.id = 1)
+      b2 <- lm.coeff(inc.lm[[potential.rice[i]]], coef.id = 2)
+      rsq <- lm.rsquare(inc.lm[[potential.rice[i]]])
+      pkevi <- which(new.evi==max.evi)    
+      # TODO: Verify max.evi as maturity
+      post.pk <- which(new.evi[(pkevi+1):length(new.evi)]<=eos.evi)
+      if(length(post.pk)>0) {
+        post.pk <- min(pkevi+post.pk,length(newx$x))
+        rice.eos <- newx$x[post.pk]
+        dat.rice <- rbind(dat.rice, c(rice.sos, rice.eos, intercept, b1, b2, rsq))
+        last.rice <- rice.eos
+      } else next
+    }   
+  }
+  
   return(dat.rice)
 }
 
+
+nonrice.regression <- function(ts.vi, vi.date){
+  dat.vi <- data.frame(y=ts.vi, x=vi.date)
+  dat.vi <- na.omit(dat.vi)
+  # Perform linear regression to immediately check if theres a need for iterative regression
+  lm.all <- lm(y~x, data = dat.vi)
+  lm.allsum <- summary(lm.all)
+  
+  dat.rice <- c(lm.allsum$coefficients[1,1],lm.allsum$coefficients[2,1], lm.pvalue(lm.all), lm.allsum$r.squared)
+  return(dat.rice)
+}
 
 rice.ts <- function(ts.vi, ts.date, ts.flood=NULL, analysis.fun=regression.rice, data.interval=8, crop.duration=160, rnr.only=FALSE, ...){
   # Adjustable Xiao-based rice detection algorithm.

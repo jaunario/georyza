@@ -58,7 +58,7 @@ xiaoflags.rice <- function(evi, evi.ricemax=NULL, evi.halfricemax=NULL, data.int
   }
 
   if(is.null(evi.halfricemax)){
-    evi.halfricemax <- evi.ricemax-((evi.ricemax-evi[1])/2)
+    evi.halfricemax <- evi.ricemax/2 # evi.ricemax-((evi.ricemax-evi[1])/2)
   }
   
   if(ricemax.post40){

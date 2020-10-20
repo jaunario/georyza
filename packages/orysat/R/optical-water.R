@@ -5,9 +5,11 @@
 
 # TODO: verify if this is NDFI
 # New NDWI using RED band and SWIR2 in MODIS reflectance product
-ndwi7 <- function(red, swir2){ 
-  n7 <- (red - swir2) / (red + swir2)
-  return(n7)
+ndfi <- function(red, swir2){ 
+  result <- (red - swir2) / (red + swir2)
+  result[result < -1] <- -1
+  result[result > 1] <- 1
+  return(result)
 }
 
 dvel <- function(evi, lswi){
