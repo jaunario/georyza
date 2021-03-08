@@ -51,7 +51,7 @@ download.modis <- function(tile, years, userpwd, doy=NULL, product="MOD09A1", pr
 	curl_handle <- new_handle(userpwd=userpwd)
 	
 	for (pr in product){
-		prod.info <- modprods[grep(pr,modprods$ShortName),]
+		prod.info <- modis.productinfo(pr)
 		# if(!grepl("day", prod.info$Temporal.Granularity)){
 		# 	warning("Unsupported product ", product,". Kindly contact the developer.")
 		# 	next
@@ -59,7 +59,7 @@ download.modis <- function(tile, years, userpwd, doy=NULL, product="MOD09A1", pr
 		
 		prod.site <- paste(modis.site, "MO", switch(prod.info$Platform, Aqua="LA", Terra="LT", Combined="TA"), "/", paste(pr,sprintf(paste("%03d",sep=""),prod.ver),sep="."),sep="")
 		tim.gran <- paste("t",gsub(" ", "", prod.info$Temporal.Granularity),sep="")
-		validdoys <- switch(tim.gran, t4day=seq(from=1,to=365, by=4), t8day=seq(from=1,to=365, by=8), t16day=ifelse(rep(prod.info$Platform,23)=="Aqua", seq(from=9,to=365, by=16), seq(from=1,to=365, by=16)), tYearly=1, tdaily=1:365)
+		validdoys <- modis.acqdoys(pr) 
 		
 		if (is.null(doy)){
 			doy <- validdoys				

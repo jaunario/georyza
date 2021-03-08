@@ -9,14 +9,37 @@
 
 PROJ.MODIS <- "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +R=6371007.181 +units=m +no_defs"
 
-modis.acqdoys <- function(){
-  
+#lpdaac.search
+
+modis.productinfo <- function(product, online=FALSE){
+  # TODO: Create Function that utilizes online LPDAAC Catalog
+  if(online){
+    
+  } else {
+    modprods <- read.csv(system.file("satproducts/modis.products.ref.csv", package="orysat"), stringsAsFactors=FALSE)
+  }
+  return(modprods[modprods$ShortName==product,])
 }
 
-modis.productinfo <- function(product){
-  # TODO: Create Function that utilizes online LPDAAC Catalog
-  modprods <- read.csv(system.file("satproducts/modis.products.ref.csv", package="orysat"), stringsAsFactors=FALSE)
-  return(modprods[modprods$ShortName==product,])
+modis.acqdoys <- function(product){
+  prod.info <- modis.productinfo(product)
+  acq.by <- switch(prod.info$Temporal.Granularity, Daily=1, Yearly=365, "4 day"=4, "8 day"=8, "16 day"=16, NA)
+  if(is.na(acq.by)){
+    message("Unsupported MODIS Product. Skipping.")
+    next
+  } else if (acq.by==16){
+    if(prod.info$Platform=="Terra"){
+      doy <-  seq(1,366, by=acq.by)
+    } else if(prod.info$Platform=="Aqua"){
+      doy <-  seq(9,366, by=acq.by)
+    } else {
+      message("Unsupported MODIS Product. Skipping.")
+      doy <- vector()
+    }
+  } else {
+    doy <-  seq(1,365, by=acq.by)
+  }
+  return(doy)
 }
 
 modis.readHDF <- function(hdffile, layer=1, verbose=TRUE, ...){
