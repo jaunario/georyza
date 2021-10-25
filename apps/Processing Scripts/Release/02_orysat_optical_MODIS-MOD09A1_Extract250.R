@@ -2,31 +2,40 @@
 # Use of MODIS Land COver product, MCD12Q1 allows the masking of features that are expected to be non-rice. 
 # This reduces the processing time significantly as this will exclude the masked areas from the analysis  
 
-# DIRECTORY SETTINGS
-MODIS_HOME = "F:/MODIS"
-WORKSPACE  = "E:/WORKSPACE/FLAGSHIP"
-   
+# DIRECTO/RY SETTINGS
+MODIS_HOME = "F:/MODIS"                           # Local directory where MODIS HDF files were saved
+WORKSPACE  = "E:/WORKSPACE/FLAGSHIP"              # A google dive folder for saving crop.curve outputs and rice maps
+PROCESS_DIR = "E:/WORKSPACE/Demeter Initiative"   # Local directory for saving intermediate files
+
 # MODIS SETTINGS
-TILE        = "h27v07"
-PRODUCTS    = "MOD09A1"
+TILE        = "h25v07"
+PRODUCTS    =  "MOD13Q1" #"MOD09A1"
 PROD_VER    = 6
 
-LAYERS        = c(1:7,12,13)
-LAYER_NAMES   = c("red", "nir", "blue", "green", "nir2","swir", "swir2", "state_500m", "julianday")
+# TODO: Automate based on products using mod.prods for now then using lpdaac.search later
+
+# 500m Products
+# LAYERS        = c(1:7,12,13)
+# LAYER_NAMES   = c("red", "nir", "blue", "green", "nir2","swir", "swir2", "state_500m", "julianday")
+
+# 250m products
+# LAYERS        = c(1:7,11,12)
+# LAYER_NAMES   = c("ndvi", "evi", "qaflag", "red", "nir", "blue","mir", "doy", "reliability")
 
 SQA_FILL     = c("cloud", "internalCloud")
 
 # METHOD SETTINGS
-YEAR       = 2020
+YEAR       = 2018
 
 # PROCESS OPTIONS
-INDICES       = c("ndvi", "evi", "lswi", "ndsi", "mndwi", "ndfi")
-LAYERS_TOFILL = 1:6
+#INDICES       = c("ndvi", "evi", "lswi", "ndsi", "mndwi", "ndfi")
+#INDICES       = c("lswi", "ndsi", "mndwi", "ndfi")
+# LAYERS_TOFILL = 1:6
 
 
 # SYSTEM SETTINGS
-SETTINGS_FILE = ""
-INDICES_DIR   = paste0(WORKSPACE, "/INDICES/", TILE)
+SETTINGS_FILE = "00_orysat_RiceMap-Flagship_SETTINGS-Template.R"
+INDICES_DIR   = paste0(WORKSPACE, "/250m/INDICES/", TILE)
 SKIP_EXISTING = FALSE
 
 # PROCESS PROPER
@@ -37,15 +46,19 @@ if(SETTINGS_FILE!="") source(SETTINGS_FILE)
 message("ORYSAT: Preparing R environment.")
 
 setwd(WORKSPACE)
+if(SETTINGS_FILE!="" && file.exists(SETTINGS_FILE)) source(SETTINGS_FILE)
 if(!dir.exists(INDICES_DIR)) dir.create(INDICES_DIR, recursive = TRUE)
 
 library(orysat)
 library(manipulateR)
 pylibs.start(python="~/../miniconda3", required=TRUE)
 
+modprods <- read.csv(system.file("satPRODUCTS/modis.PRODUCTS.ref.csv", package="orysat"), stringsAsFactors=FALSE)
+
 # List required images for the specified year and method
 # TODO: Make a function to create this using a function
-ACQDOYS <- seq(from=1,to=361, by=8)
+info.prod <- modprods[modprods$ShortName==PRODUCTS,]
+ACQDOYS <-  switch(info.prod$Temporal.Granularity, Yearly=1, Daily=1:365, "16 day"={if(info.prod$Platform=="Terra") seq(1,361,by=16) else seq(9,361,by=16)}, "8 day"=seq(1,361,by=8),NA)
 required.acqdates <- paste0("A",YEAR,sprintf("%03g", ACQDOYS))
   
 

@@ -20,7 +20,7 @@ MISSING_THRES   = 50
 METHOD     = "VWIDynamics"
 VERSION    = 0.1 
 YEAR       = 2019
-TILE       = "h26v06"
+TILE       = "h27v07"
 PRODUCTS    = "MOD09A1"
 
 # TODO: Have default layer-parameter mapping but allow custom mapping for experimental methods
@@ -103,6 +103,12 @@ st <- Sys.time()
 crops <- lapply(mat.evi, crop.signature)
 en <- Sys.time()
 
+crop.itensity <- sapply(crops, nrow)
+crops <- crops[crop.itensity>0]
+pixels.toprocess <- pixels.toprocess[crop.itensity>0]
+
+crops <- mapply(data.frame, cell=as.list(pixels.toprocess), crops, SIMPLIFY = FALSE)
+crops <- do.call(rbind, crops)
 
 saveRDS(crops, file=paste0(CACHE_DIR, "/",paste("CROP", METHOD,TILE, YEAR, sep = "_") ,".rds"))
 
@@ -142,25 +148,27 @@ saveRDS(crops, file=paste0(CACHE_DIR, "/",paste("CROP", METHOD,TILE, YEAR, sep =
 #   rice <- mapply(rice.VWIdynamics, vi=mat.evi, wi=mat.mndwi)
 # }
 timeen.rice <- Sys.time()
-
-rice <- mapply(labelResult, x=rice, label=as.list(pixels.toprocess))
-rice <- do.call(rbind,rice)
-rice <- as.data.frame(rice)
-colnames(rice)[1] <- "cell"
-saveRDS(rice, file=paste0(CACHE_DIR, "/DF_RICE-", METHOD, "_", paste(TILE, YEAR, "VWDProds", "rds", sep=".")))
+cropping.seasons <- sapply(crops, nrow)
+pixels.toprocess <- pixels.toprocess[cropping.seasons>0]
+crops <- crops[cropping.seasons>0]
+crops <- mapply(data.frame, cell=as.list(pixels.toprocess), crops, SIMPLIFY = FALSE)
+crops <- do.call(rbind,crops)
+#crops <- as.data.frame(crops)
+#colnames(rice)[1] <- "cell"
+saveRDS(crops, file=paste0(CACHE_DIR, "/DF_RICE-", METHOD, "_", paste(TILE, YEAR, "VWDProds", "rds", sep=".")))
 
 #colnames(rice) <- c("cell", "sos", "eos", "intercept", "b1", "b2", "rsq")
+crops$eosdate <- date.acqdates[crops$eos]
+crops$eosyear <- yearFromDate(crops$eosdate)
+crops <- crops[crops$eosyear==YEAR, ]
 
-rice$sosdate <- date.acqdates[rice$sos]
-rice$eosdate <- date.acqdates[rice$eos]
-rice$flwrdate <- date.acqdates[rice$flwr]
+crops$sosdate <- date.acqdates[crops$sos]
+crops$flwrdate <- date.acqdates[crops$pos]
 
-rice$eosyear <- yearFromDate(rice$eosdate)
-rice$sosmonth <- monthFromDate(rice$sosdate)
+crops$sosmonth <- monthFromDate(crops$sosdate)
+crops$crop.period <- crops$eosdate-crops$sosdate 
 
-rice <- rice[rice$eosyear==YEAR, ]
-rice$crop.period <- rice$eosdate-rice$sosdate 
-rice <- subset(rice, mean.vi>=2000 & sd.vi>=350 & sd.wi>= 500 & crop.period>=90)
+rice <- subset(crops, meanVI>=2000 & sdVI>=350 & crop.period>=90)
 
 quarters <- list(1:3, 4:6, 7:9, 10:12)
 for(i in 1:4){

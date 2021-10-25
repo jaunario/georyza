@@ -19,8 +19,8 @@ MISSING_THRES   = 50
 
 METHOD     = "VWIDynamics"
 VERSION    = 0.1 
-YEAR       = 2019
-TILE       = "h27v07"
+YEAR       = 2007
+TILE       = "h25v06"
 PRODUCTS    = "MOD09A1"
 
 # TODO: Have default layer-parameter mapping but allow custom mapping for experimental methods
@@ -29,21 +29,22 @@ LAYERPARAM_MAPPING  = list(vi="EVI", wi="MNDWI")
 library(orysat)
 library(manipulateR)
 
-# maxlen.condition <- function(x){
-#   if(sum(is.na(x))==length(x)) {
-#     result <- NA
-#   } else {
-#     x <- which(x)
-#     result <- maxConsecutive(x)
-#   }
-#   return(result)
-# }
-# 
-# approx_int <- function(...){
-#   result <- approx(...)$y
-#   result <- as.integer(round(result))
-#   return(result)
-# }
+maxlen.condition <- function(x){
+  if(sum(is.na(x))==length(x)) {
+    result <- NA
+  } else {
+    x <- which(x)
+    result <- maxConsecutive(x)
+  }
+  return(result)
+}
+
+
+approx_int <- function(...){
+  result <- approx(...)$y
+  result <- as.integer(round(result))
+  return(result)
+}
 
 setwd(WORKSPACE)
 
@@ -87,73 +88,22 @@ timest.extract <- Sys.time()
 
 pixels.toprocess <- readRDS(file=paste0(CACHE_DIR, "/NUM_INDEX_", paste(TILE, YEAR, "IDX_TOPROC", "rds", sep=".")))
 # pixels.toprocess <- pixels.toprocess[which(!pixels.toprocess %in% idx.tomask )]
-crops <- readRDS(file=paste0(CACHE_DIR, "/", paste("CROP", METHOD,TILE, YEAR, sep = "_") ,".rds"))
-
-crops$maturity <- crops$eos-crops$pos
-crops$plant.mo <- monthFromDate(date.acqdates[crops$sos])
-crops$harv.mo <- monthFromDate(date.acqdates[crops$eos])
-
-
-rice <- subset(crops, meanVI>=2000 & sdVI>=350 & crop.duration>10 & crop.duration<30 & maturity<=6)
-
-pixels.rice <- table(rice$cell)
-potential.rice <- as.numeric(names(pixels.rice))
-aa <- raster(stk.mndwi)
-aa[potential.rice] <- pixels.rice 
-maybe.rice <- which(pixels.rice>2)
-rice.unlikely <- rice[maybe.rice,]
-plot(aa)
-
-message("ORYSAT-", METHOD, ": Extracting MNDWI.")
-stk.mndwi <- raster::stack(inv.idxfiles$filename[inv.idxfiles$band=="MNDWI"])
-mat.mndwi <- raster::values(stk.mndwi)
-mat.mndwi <- mat.mndwi[potential.rice, ]
-mat.mndwi <- t(mat.mndwi)
-mat.mndwi <- as.data.frame(mat.mndwi)
-
-fld.st <- rice$sos-2
-fld.st[fld.st<1] <- 1 
-fld.en <- rice$sos+1
-fld.idx <- mapply(":", as.list(fld.st), as.list(fld.en), SIMPLIFY = FALSE)
-rice.idx <- match(rice$cell, potential.rice)
-mndwi.rice <- mat.mndwi[rice.idx] 
-mndwi.fld <- mapply("[", mndwi.rice, idx=fld.idx, SIMPLIFY = FALSE)
-
-fld <- lapply(mndwi.fld, ">=", -2280)
-fld <- sapply(fld, sum)
-rice$lowland <- fld>0
-
-aman <- crops[crops$plant.mo %in% 6:9,]
-rice <- subset(crops, meanVI>=2000 & sdVI>=350 & crop.duration>10 & crop.duration<30 & maturity<=6)
-
-rice.sum <- aggregate(lowland~cell, data=aman, sum)
-xx <- raster(stk.evi)
-xx[aman$cell] <- aman$plant.mo
-plot(xx)
-
 
 message("ORYSAT-", METHOD, ": Extracting EVI.")
 stk.evi <- raster::stack(inv.idxfiles$filename[inv.idxfiles$band=="EVI"])
 mat.evi <- raster::values(stk.evi)
-mat.evi <- mat.evi[potential.rice,]
-rmat.evi <- t(mat.evi)
+mat.evi <- mat.evi[pixels.toprocess,]
+mat.evi <- t(mat.evi)
 mat.evi <- as.data.frame(mat.evi)
-
-st <- Sys.time()
-crops <- lapply(mat.evi, crop.signature)
-en <- Sys.time()
-
-
-
-
-saveRDS(crops, file=paste0(CACHE_DIR, "/", paste("CROP", METHOD,TILE, YEAR, sep = "_") ,".rds"))
-
-crop.intensity <- sapply(crops, nrow)
-aa <- raster(stk.evi)
-aa[pixels.toprocess] <- crop.intensity
 avg.evi <- rowMeans(mat.evi, na.rm = TRUE)
 sd.evi  <- apply(mat.evi, 1, sd)
 
+message("ORYSAT-", METHOD, ": Extracting MNDWI.")
+stk.mndwi <- raster::stack(inv.idxfiles$filename[inv.idxfiles$band=="MNDWI"])
+mat.mndwi <- raster::values(stk.mndwi)
+mat.mndwi <- mat.mndwi[pixels.toprocess, ]
+mat.mndwi <- t(mat.mndwi)
+mat.mndwi <- as.data.frame(mat.mndwi)
 
 rice <- mapply(rice.VWIdynamics, vi=mat.evi, wi=mat.mndwi)
 rm(mat.evi, mat.mndwi)
