@@ -4,22 +4,35 @@
 #     -5 - Shrub
 #     -6 - persistent water
 # library(future.apply)
+WORKSPACE  = "E:/WORKSPACE/Orysat"
+INDICES_DIR = paste0(WORKSPACE, "/mosaic")
+
 APPROX_BY_JULIANDAY = TRUE
 CONSMISSING_THRES   = 5
+
+METHOD     = "Xiao-V1"
+YEAR       = 2007
+TILE       = "h26v06"
+PRODUCTS    = "MOD09A1"
+
+APPROX_BY_JULIANDAY = TRUE
+CONSMISSING_THRES   = 5
+
 library(orysat)
 library(manipulateR)
-
 
 maxlen.condition <- function(x){
   x <- which(x)
   return(maxConsecutive(x))
 }
 
-approx_int <- function(...){
-  result <- approx(...)$y
-  result <- round(result)
-  return(result)
-}
+setwd(WORKSPACE)
+
+ACQDOYS <- seq(from=1,to=361, by=8)
+required.acqdates <- paste("A",c(paste(YEAR-1,sprintf("%03g", ACQDOYS)[(length(ACQDOYS)-7):length(ACQDOYS)], sep=""),  #PREVIOUS YEAR
+                                 paste(YEAR,sprintf("%03g", ACQDOYS), sep=""),           # CURRENT YEAR
+                                 paste(YEAR+1,sprintf("%03g",ACQDOYS)[1:11], sep="")),   # SUCCEEDING YEAR
+                           sep="")
 
 # Extract data
 message("ORYSAT-", METHOD, ": Listing files.")
@@ -50,6 +63,9 @@ message("ORYSAT-", METHOD, ": Identifying forests.")
 forest.count <- colSums(mat.ndvi[grepl(YEAR, required.acqdates),]>=7000, na.rm = TRUE)
 rst.lc[pixels.toprocess[forest.count>=20]] <- -4 # Forests
 
+#xx <- apply(mat.ndvi[grepl(YEAR, required.acqdates),]-7000,2, ttest.p)
+#rst.lc[pixels.toprocess[xx>0.05]] <- -4 # Forests
+
 message("ORYSAT-", METHOD, ": Identifying snow.")
 # For masking out pixels with too many consecutive Snow or too many snow instances
 # in case snw.maxlen is not good enough, the 2 conditions below can be explored
@@ -63,7 +79,6 @@ snw.maxlen <- apply(mat.ndvi == -32767, 2, maxlen.condition)
 rst.lc[pixels.toprocess[snw.maxlen>3 & nsnw.maxlen<10]] <- -7 # Snow
 
 
-save(mat.ndvi, file=paste0("mat_ndvi", YEAR, ".Rdata"))
 timest.lswi <- Sys.time()
 message("ORYSAT-", METHOD, ": Extracting LSWI.")
 stk.lswi <- raster::stack(inv.idxfiles$filename[inv.idxfiles$band=="LSWI"])
@@ -101,7 +116,6 @@ if(APPROX_BY_JULIANDAY){
   fill.ndvi <- mapply(approx, y=mat.ndvi, x=mat.jday, xout=data.frame(xout=as.Date(required.acqdates, "A%Y%j")))
   fill.ndvi <- unlist(fill.ndvi[seq(2, length(fill.ndvi), by=2)])
   fill.ndvi <- matrix(fill.ndvi, nrow=length(required.acqdates))
-  
 } else {
   # Linear interpolation of time series
   fill.ndvi <- apply(mat.ndvi, 2, approx_int, x=1:ncol(mat.ndvi), xout=1:ncol(mat.ndvi)) # Output is a dataframe of time-series ndvi values where pixels are at the columns
@@ -111,12 +125,19 @@ fill.ndvi <- fill.ndvi/10000
 fill.ndvi <- round(fill.ndvi,4)
 fill.ndvi <- as.data.frame(fill.ndvi)
 
+if(object.size(fill.ndvi)>2000000000){
+  message("ORYSAT-", METHOD, ": Caching NDVI.")
+  save(fill.ndvi, file=paste0("ndvi", YEAR, ".Rdata"))
+  rm(fill.ndvi)
+  cache <- TRUE
+} else cache <- FALSE
+
+
 message("ORYSAT-", METHOD, ": Adjusting LSWI to equally-spaced acqdate date.")
 if(APPROX_BY_JULIANDAY){
   fill.lswi <- mapply(approx, y=mat.lswi, x=mat.jday, xout=data.frame(xout=as.Date(required.acqdates, "A%Y%j")))
-  fill.lswi <- unlist(fill.lswi[seq(2, length(fill.lswi), by=2)])
-  fill.lswi <- matrix(fill.lswi, nrow=length(required.acqdates))
-  
+  fill.lswi <- fill.lswi[seq(2, length(fill.lswi), by=2)]
+  fill.lswi <- unlist(fill.lswi)
 } else {
   # Linear interpolation of time series
   fill.lswi <- apply(mat.lswi, 1, approx_int, x=1:ncol(mat.lswi), xout=1:ncol(mat.lswi)) # Output is a dataframe of time-series lswi values where pixels are at the columns
@@ -124,7 +145,14 @@ if(APPROX_BY_JULIANDAY){
 rm(mat.lswi)
 fill.lswi <- fill.lswi/10000
 fill.lswi <- round(fill.lswi,4)
+fill.lswi <- matrix(fill.lswi, nrow=length(required.acqdates))
 fill.lswi <- as.data.frame(fill.lswi)
+
+if(cache){
+  message("ORYSAT-", METHOD, ": Caching LSWI.")
+  save(fill.lswi, file=paste0("lswi", YEAR, ".Rdata"))
+  rm(fill.lswi)
+}
 
 message("ORYSAT-", METHOD, ": Extracting EVI.")
 stk.evi <- raster::stack(inv.idxfiles$filename[inv.idxfiles$band=="EVI"])
@@ -136,7 +164,8 @@ mat.evi <- as.data.frame(mat.evi)
 message("ORYSAT-", METHOD, ": Adjusting EVI to equally-spaced acqdate date.")
 if(APPROX_BY_JULIANDAY){
   fill.evi <- mapply(approx, y=mat.evi, x=mat.jday, xout=data.frame(xout=as.Date(required.acqdates, "A%Y%j")))
-  fill.evi <- unlist(fill.evi[seq(2, length(fill.evi), by=2)])
+  fill.evi <- fill.evi[seq(2, length(fill.evi), by=2)]
+  fill.evi <- unlist(fill.evi)
   fill.evi <- matrix(fill.evi, nrow=length(required.acqdates))
   
 } else {
@@ -148,6 +177,13 @@ fill.evi <- fill.evi/10000
 fill.evi <- round(fill.evi,4)
 fill.evi <- as.data.frame(fill.evi)
 
+if(cache){
+  message("ORYSAT-", METHOD, ": Loading Cache.")
+  rm(mat.jday)
+  load(file=paste0("ndvi", YEAR, ".Rdata"))
+  load(file=paste0("lswi", YEAR, ".Rdata"))
+}
+
 rst.rice <- raster(rst.lc)
 rst.rice[pixels.toprocess[potential.rice]] <- mapply(FUN=rice.Xiao_v1, evi=fill.evi, lswi=fill.lswi, ndvi=fill.ndvi) #, evi.ricemax=0, evi.halfricemax=0) 
 
@@ -158,3 +194,5 @@ timeen.proc <- timeen.rice <- Sys.time()
 timedur.rice <- timeen.proc-timest.extract
 
 message("ORYSAT-", METHOD, ": Done. (", round(timedur.rice,2), " ", attr(timedur.rice, "unit"), ") ")
+rm(list=ls())
+.rs.restartR()
