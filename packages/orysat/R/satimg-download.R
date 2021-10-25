@@ -78,7 +78,10 @@ download.modis <- function(tile, years, userpwd, doy=NULL, product="MOD09A1", pr
 				for (tl in tile){
 					if (is.null(savepath)) tile.dir <- paste(pr,tl, sep="/") else tile.dir <- savepath
 					tile.page <- date.page[grep(paste(pr, acqdate, tl, sep="."),date.page)]
-					tile.page <- tile.page[-grep("BROWSE",tile.page)]
+					if(length(grep("BROWSE",tile.page))>0){
+					  tile.page <- tile.page[-grep("BROWSE",tile.page)]  
+					}
+					
 					link.st <- regexpr(paste(">",product,".*./",sep=""), tile.page)
 					link.en <- regexpr("</a>", tile.page)
 					tilefiles <- substr(tile.page, link.st+1,link.en-1)
@@ -129,6 +132,7 @@ download.modis <- function(tile, years, userpwd, doy=NULL, product="MOD09A1", pr
 						# File not yet downloaded - attempt to get it!
 						if (verbose) message("Downloading ", hdffile, appendLF=TRUE)
 						hdf <- try(curl_fetch_disk(tile.site[1], path=paste(tile.dir, hdffile, sep="/"), handle=curl_handle))
+						#TODO: Check downloaded file if error message also
 						if(class(hdf)=="try-error"){
 							break
 						}

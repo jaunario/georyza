@@ -45,9 +45,11 @@ ttest.p <- function(pixel.data, ...){
 #   pnorm
 # }
 
-safe.sg <- function(data,...){
+safe.sg <- function(data, filt.len, ...){
   nna <- which(!is.na(data))
-  data[nna] <- signal::sgolayfilt(data[nna],...)
+  if(length(nna)>filt.len){
+    data[nna] <- signal::sgolayfilt(data[nna], n=filt.len, ...)  
+  }
   return(data)
 }
 

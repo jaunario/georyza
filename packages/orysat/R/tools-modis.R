@@ -77,7 +77,7 @@ modis.readHDF <- function(hdffile, layer=1, verbose=TRUE, ...){
     
     if(m@projection==""){
       proj.crs <- pyosr$SpatialReference()
-      proj.crs$ImportFromWkt(obj.sds$GetProjection())
+      #proj.crs$ImportFromWkt(obj.sds$GetProjection())
 
       obj.origin <- obj.sds$GetGeoTransform()
       minX <- obj.origin[[1]]
@@ -88,7 +88,7 @@ modis.readHDF <- function(hdffile, layer=1, verbose=TRUE, ...){
       resY <- obj.origin[[6]]
       minY <- maxY + resY * obj.sds$RasterYSize
       m@extent <- extent(minX, maxX, minY, maxY)
-      m@projection <- proj.crs$ExportToProj4()
+      m@projection <- obj.sds$GetProjection()
       m@ncols <- obj.sds$RasterXSize
       m@nrows <- obj.sds$RasterYSize
       rm(proj.crs, minX, maxX, resX, minY, maxY, resY)
