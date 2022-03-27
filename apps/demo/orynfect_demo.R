@@ -42,25 +42,29 @@ for (i in 1:length(files.wth)){
 
 dat.infection <- cbind(dat.infection, xyFromCell(rst.riceplant, dat.infection$cell)) 
 dat.infection$audpc.class <- cut(dat.infection$audpc,breaks=seq(0,450,length.out = 9))
+write.csv(dat.infection, "PHL_Leafblast_2010-2018_main.csv", row.names = FALSE)
 ggplot()+ geom_tile(data = dat.infection, aes(x=x,y=y, fill=audpc.class )) +facet_wrap(~year) + scale_fill_brewer(palette = "Reds") + theme_dark() + theme(legend.position = "bottom")
 
-# shp.phl <- getData(country="PHL", level=0)
-# if(exists("stk.infection")) rm(stk.infection)
-# for(yr in YEARS){
-#   message("Year-",yr)
-#   dat.yrinect <- dat.infection[dat.infection$year==yr,]
-#   rst.infection <- raster(rst.riceplant)
-#   rst.infection[dat.yrinect$cell] <- dat.yrinect$audpc
-#   rst.infection <- crop(rst.infection, shp.phl)
-#   dat.gginfect <- as.data.frame(stk.infection, xy=TRUE)
-#   
-#   if(!exists("stk.infection")) stk.infection <- raster::stack(rst.infection) else stk.infection <- addLayer(stk.infection, rst.infection)
-#   plot(rst.infection, col=colorRampPalette(c("white", "#aa0000"))(25), main=yr, zlim=c(0,400))
-#   plot(shp.phl, add=TRUE, border="#aaaaaa")
-#   Sys.sleep(1)
-# }  
-# names(stk.infection) <- paste("Year", YEARS)
-# levelplot(stk.infection, layout=c(3,3), par.settings=BuRdTheme)
-# st <- Sys.time()
-# yy <- leafBlast(wth, emergence = wth@w$date[2])@d
-# Sys.time()-st
+shp.phl <- getData(country="PHL", level=0)
+if(exists("stk.infection")) rm(stk.infection)
+for(yr in YEARS){
+  message("Year-",yr)
+  dat.yrinect <- dat.infection[dat.infection$year==yr,]
+  rst.infection <- raster(rst.riceplant)
+  rst.infection[dat.yrinect$cell] <- dat.yrinect$audpc
+  rst.infection <- crop(rst.infection, shp.phl)
+  
+  if(!exists("stk.infection")) stk.infection <- raster::stack(rst.infection) else stk.infection <- addLayer(stk.infection, rst.infection)
+  dat.gginfect <- as.data.frame(stk.infection, xy=TRUE)
+  plot(rst.infection, col=colorRampPalette(c("white", "#aa0000"))(25), main=yr, zlim=c(0,400))
+  plot(shp.phl, add=TRUE, border="#aaaaaa")
+  Sys.sleep(1)
+}
+names(stk.infection) <- paste("Year", YEARS)
+customYlOrRdThemeb<- rasterVis::YlOrRdTheme()
+customYlOrRdThemeb$panel.background$col = "#444444"
+
+rasterVis::levelplot(stk.infection, layout=c(3,3), par.settings=customYlOrRdThemeb)
+st <- Sys.time()
+yy <- leafBlast(wth, emergence = wth@w$date[2])@d
+Sys.time()-st

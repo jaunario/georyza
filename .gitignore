@@ -3,8 +3,9 @@
 *.Rbuildignore
 *.Rhistory
 .Rproj.user
-.RData
+*.RData
 *.rds
 *.Rcheck
 *.tar.gz
 *.project
+*.zip
