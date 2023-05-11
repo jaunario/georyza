@@ -1,12 +1,12 @@
 Package: orysat
 Type: Package
 Title: Satellite-based rice mapping package
-Version: 0.0.30
-Date: 2018-04-01
-Depends: R (>= 3.0), RemoteSensing, reticulate, rgdal, curl 
-#Suggests: parallel, signal
+Version: 0.3.0
+Date: 2023-05-07
+Depends: R (>= 3.0), terra, curl, manipulateR
+Suggests: signal, reticulate
 Author: Jorrel Khalil Aunario
 Maintainer: Jorrel Khalil S. Aunario <jaunario@gmail.com>
 Description: Orysat is a compilation of satellite-based rice and rice-related information mapping methodologies. This includes rice detection and rice phenology.
 License: GPL (>= 3)
-Packaged: 2013-02-11 22:47:42 UTC
+Packaged: 2022-01-28 23:55:49 UTC
