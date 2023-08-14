@@ -162,7 +162,7 @@ rice.Xiao_v1 <- function(evi, lswi, ndvi=NULL, evi.floodmax=0.25, evi.ricemax=-1
 # }
 
 
-rice.modxiao <- function(ts.vi, ts.flood=NULL, analysis.fun=xiaoflags.rice, data.interval=8, crop.duration=120, rnr.only=FALSE, ...){
+rice.modxiao <- function(ts.vi, ts.flood=NULL, analysis.fun=xiaoflags.rice, sos.fun=min, data.interval=8, crop.duration=120, rnr.only=FALSE, ...){
 # Adjustable Xiao-based rice detection algorithm.
 # Input any vegetation index, any flood vector
 # 
@@ -177,7 +177,7 @@ rice.modxiao <- function(ts.vi, ts.flood=NULL, analysis.fun=xiaoflags.rice, data
   
   if (length(flooding)>0){
     
-    flooding <- sapply(consecutive.groups(flooding), max) # For 
+    flooding <- sapply(consecutive.groups(flooding), sos.fun) # For 
     #evi.flood <- ts.vi[flooding]
     
     # Get evi from start of flooding upto crop duration
