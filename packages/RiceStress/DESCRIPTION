@@ -1,0 +1,12 @@
+Package: RiceStress
+Type: Package
+Title: Mapping rice temperature stress by analyzing historical data
+Version: 0.0.10
+Date: 20-February-2014
+Depends: GloCR
+Suggests: rgdal
+Author: Alice Laborte, Jorrel Aunario, Andy Nelson
+Maintainer: Jorrel Khalil Aunario <j.aunario@irri.org> 
+Description: Rice stress mapping algorithms
+License: GPL (>=3)
+LazyLoad: yes

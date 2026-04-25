@@ -11,6 +11,12 @@ PROJ.MODIS <- "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +R=6371007.181 +units=m +no_def
 
 # lpdaac.search
 
+#' @title Get MODIS Product Information
+#' @description Retrieves information about a MODIS product from a local reference file.
+#' @param product Short name of the MODIS product (e.g., "MOD09A1").
+#' @param online Logical; if TRUE, attempts to fetch information online (not yet implemented).
+#' @return A data frame containing product information.
+#' @export
 modis.productinfo <- function(product, online = FALSE) {
   # TODO: Create Function that utilizes online LPDAAC Catalog
   if (online) {} else {
@@ -19,6 +25,11 @@ modis.productinfo <- function(product, online = FALSE) {
   modprods[modprods$ShortName == product, ]
 }
 
+#' @title Get MODIS Acquisition DOYs
+#' @description Returns the standard acquisition Days of Year (DOYs) for a given MODIS product.
+#' @param product Short name of the MODIS product.
+#' @return A numeric vector of DOYs.
+#' @export
 modis.acqdoys <- function(product) {
   prod.info <- modis.productinfo(product)
   acq.by <- switch(prod.info$Temporal.Granularity,
@@ -31,7 +42,7 @@ modis.acqdoys <- function(product) {
   )
   if (is.na(acq.by)) {
     message("Unsupported MODIS Product. Skipping.")
-    next
+    doy <- vector()
   } else if (acq.by == 16) {
     if (prod.info$Platform == "Terra") {
       doy <- seq(1, 366, by = acq.by)
@@ -47,14 +58,16 @@ modis.acqdoys <- function(product) {
   doy
 }
 
+#' @title Read MODIS HDF File
+#' @description Reads a MODIS HDF file and extracts specified layers into a `modis.data` object.
+#' @param hdffile Path to the HDF file.
+#' @param layer Indices of layers to read (default: all).
+#' @param verbose Logical; if TRUE, prints progress messages.
+#' @param ... Additional arguments passed to `pylibs.start`.
+#' @return A `modis.data` object.
+#' @export
 modis.readHDF <- function(hdffile, layer = 1, verbose = TRUE, ...) {
   if (!exists("pygdal") || !exists("pyosr")) {
-    # #stop("Run python start")
-    # use_python("~/../AppData/Local/r-miniconda/python")
-    # list.libs=list(pygdal ="gdal", pyosr="osr")
-    # for(i in seq_along(list.libs)){
-    #   assign(names(list.libs)[i], import(list.libs[[i]]))
-    # }
     pylibs.start(...)
   }
 
@@ -112,6 +125,12 @@ modis.readHDF <- function(hdffile, layer = 1, verbose = TRUE, ...) {
   m
 }
 
+#' @title Fill with Adjacent Mean
+#' @description Fills missing values in a vector with the mean of its neighbors.
+#' @param x A numeric vector (typically length 9 for a 3x3 window).
+#' @param ... Additional arguments passed to `mean`.
+#' @return The filled value (center of the vector if not NA, else the mean).
+#' @export
 fillwith.adjmean <- function(x, ...) {
   center <- x[5]
   if (!is.na(center)) {
@@ -123,6 +142,14 @@ fillwith.adjmean <- function(x, ...) {
   adjmean
 }
 
+#' @title Inventory MODIS Files
+#' @description Parses MODIS filenames to extract metadata like product, acquisition date, and zone.
+#' @param modisfiles Vector of MODIS file paths.
+#' @param sep Separator used in filenames (default: ".").
+#' @param modisinfo Names of the metadata fields to extract.
+#' @param file.ext File extension (default: "tif").
+#' @return A data frame with extracted metadata and filenames.
+#' @export
 inventory.modis <- function(modisfiles, sep = "\\.", modisinfo = c("product", "acqdate", "zone", "version", "band"), file.ext = "tif") {
   # if (format=="GTiff") info <- sub(".hdf","",basename(modisfiles))
   info <- basename(modisfiles)
@@ -134,7 +161,7 @@ inventory.modis <- function(modisfiles, sep = "\\.", modisinfo = c("product", "a
   m <- data.frame(matrix(x, ncol = length(modisinfo), byrow = TRUE), stringsAsFactors = FALSE)
   if (ncol(m) != length(modisinfo)) {
     message("Non-standard filenames found ")
-    vector()
+    return(data.frame())
   }
   colnames(m) <- modisinfo
   m$year <- as.numeric(substr(m$acqdate, 2, 5))
@@ -145,6 +172,12 @@ inventory.modis <- function(modisfiles, sep = "\\.", modisinfo = c("product", "a
   m
 }
 
+#' @title Get Required Bands for Functions
+#' @description Extracts the argument names (assumed to be bands) for a list of functions.
+#' @param funlist Vector of function names.
+#' @param byfun Logical; if TRUE, returns a list of arguments per function.
+#' @return A vector or list of required band names.
+#' @export
 getRequiredBands <- function(funlist, byfun = FALSE) {
   if (byfun) argnames <- list() else argnames <- NULL
   for (i in seq_along(funlist)) {
@@ -154,6 +187,11 @@ getRequiredBands <- function(funlist, byfun = FALSE) {
   argnames
 }
 
+#' @title Format to Extension
+#' @description Converts a raster format name to its standard file extension.
+#' @param myformat Raster format name (e.g., "raster", "GTiff").
+#' @return A string representing the file extension.
+#' @export
 formatExt <- function(myformat) {
   ext <- rep(NA, length(myformat))
   ext[tolower(myformat) == "raster"] <- "grd"
@@ -162,6 +200,11 @@ formatExt <- function(myformat) {
   ext
 }
 
+#' @title Extension to Format
+#' @description Converts a file extension to its standard raster format name.
+#' @param filext File extension (e.g., "tif", "grd").
+#' @return A string representing the raster format name.
+#' @export
 extFormat <- function(filext) {
   formt <- rep(NA, length(filext))
   formt[tolower(filext) == "tif"] <- "GTiff"
@@ -169,12 +212,25 @@ extFormat <- function(filext) {
   formt
 }
 
+#' @title Get Band Names
+#' @description Returns the name of a band given its number and reference set.
+#' @param bandnum Band number.
+#' @param ref Reference set (default: "ricemap").
+#' @return Band name string.
+#' @export
 bandnames <- function(bandnum, ref = "ricemap") {
   bands <- as.data.frame(cbind(c("red", "nir1", "blue", "green", "nir2", "swir1", "swir2"), c("red", "nir", "blue", "green", NA, "swir1", "swir2")), stringsAsFactors = FALSE)
   colnames(bands) <- c("default", "ricemap")
   bands[bandnum, ref]
 }
 
+#' @title Get Band Number
+#' @description Returns the number of a band given its name and reference set.
+#' @param bandname Band name.
+#' @param ref Reference set (default: "ricemap").
+#' @param asString Logical; if TRUE, returns band number with "b" prefix.
+#' @return Band number (numeric or string).
+#' @export
 bandnumber <- function(bandname, ref = "ricemap", asString = TRUE) {
   bands <- cbind(c("red", "nir1", "blue", "green", "nir2", "swir1", "swir2"), c("red", "nir", "blue", "green", NA, "swir1", "swir2"), c("red", "nir", "blue", "green", "swir1", "swir2", "swir3"))
   colnames(bands) <- c("default", "ricemap", "web")
@@ -182,6 +238,12 @@ bandnumber <- function(bandname, ref = "ricemap", asString = TRUE) {
   result
 }
 
+#' @title Compute MODIS Indices
+#' @description Computes multiple indices or functions on a `modis.data` object.
+#' @param modis A `modis.data` object.
+#' @param funlist Vector of function names to apply.
+#' @return A data frame containing the results of each function as columns.
+#' @export
 modis.compute <- function(modis, funlist) {
   result <- layers <- vector()
   for (i in seq_along(funlist)) {
@@ -197,6 +259,19 @@ modis.compute <- function(modis, funlist) {
   as.data.frame(result)
 }
 
+#' @title Convert MODIS Data to Raster Brick
+#' @description Converts `modis.data` image values into a RasterBrick or writes them to files.
+#' @param mdata A `modis.data` object.
+#' @param process Optional label for the process.
+#' @param intlayers Indices of layers that should be saved as integers.
+#' @param writeto Directory path to write rasters to. If NULL, returns a RasterBrick.
+#' @param intNA NA flag for integer layers.
+#' @param fltNA NA flag for float layers.
+#' @param format Raster format (default: "GTiff").
+#' @param skipx Logical; if TRUE, skips existing files.
+#' @param ... Additional arguments passed to `writeRaster`.
+#' @return A RasterBrick or TRUE if written to files.
+#' @export
 modis.brick <- function(mdata, process = NULL, intlayers = NULL, writeto = NULL, intNA = -15, fltNA = -9999.0, format = "GTiff", skipx = FALSE, ...) {
   if (!file.exists(writeto)) dir.create(writeto, recursive = TRUE)
   mraster <- raster(modis@extent, ncols = modis@ncols, nrows = modis@nrows, crs = modis@projection)

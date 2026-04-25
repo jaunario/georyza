@@ -10,3 +10,5 @@ Maintainer: Jorrel Khalil S. Aunario <jaunario@gmail.com>
 Description: Orysat is a compilation of satellite-based rice and rice-related information mapping methodologies. This includes rice detection and rice phenology.
 License: GPL (>= 3)
 Packaged: 2022-01-28 23:55:49 UTC
+RoxygenNote: 7.3.3
+Encoding: UTF-8

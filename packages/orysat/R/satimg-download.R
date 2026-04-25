@@ -7,6 +7,12 @@ DL.FAST <- 0 # If already exists, skip
 DL.SMART <- 1 # If already exists, check integrity. If integrity passed, skip else delete then download again
 DL.RENEW <- 2 # If exists redownload
 
+#' @title Check Integrity of MODIS HDF File
+#' @description Compares the file size or checksum of a downloaded MODIS HDF file against its metadata (XML).
+#' @param modis.hdf Path to the downloaded HDF file.
+#' @param xml Vector of strings containing the XML metadata content.
+#' @return Logical; TRUE if integrity is verified, FALSE otherwise.
+#' @export
 check.integrity <- function(modis.hdf, xml) {
   cksumver <- Sys.which("cksum")
   if (cksumver == "") {
@@ -25,6 +31,23 @@ check.integrity <- function(modis.hdf, xml) {
   cksum == chk
 }
 
+#' @title Download MODIS Data
+#' @description Downloads MODIS HDF files and their corresponding XML metadata from a specified server.
+#' @param tile Vector of MODIS tile names (e.g., "h29v07").
+#' @param years Vector of years to download.
+#' @param userpwd Authentication credentials (e.g., "username:password").
+#' @param doy Optional vector of Days of Year (DOY) to download.
+#' @param product MODIS product name (default: "MOD09A1").
+#' @param prod.ver Product version (default: 6).
+#' @param savepath Local directory to save files. If NULL, saves to product/tile folders.
+#' @param modis.site Base URL of the MODIS data site.
+#' @param dl.mode Download mode: DL.FAST (0), DL.SMART (1), or DL.RENEW (2).
+#' @param integrity Logical; if TRUE, checks file integrity.
+#' @param skip.exists Logical; if TRUE, skips files that already exist locally.
+#' @param verbose Logical; if TRUE, prints progress messages.
+#' @param ... Additional arguments passed to curl functions.
+#' @return Vector of paths to the downloaded files.
+#' @export
 download.modis <- function(tile, years, userpwd, doy = NULL, product = "MOD09A1", prod.ver = 6, savepath = NULL, modis.site = "http://e4ftl01.cr.usgs.gov/", dl.mode = DL.SMART, integrity = TRUE, skip.exists = TRUE, verbose = TRUE, ...) {
   # Check time, stop if server downtime
 
@@ -167,6 +190,12 @@ download.modis <- function(tile, years, userpwd, doy = NULL, product = "MOD09A1"
 
 # TODO: Add GLAD download function
 # TODO: Functions below may be deprecated
+#' @title Generate Valid MODIS Folder Dates
+#' @description Generates a vector of valid MODIS 8-day folder date strings.
+#' @param styear Start year.
+#' @param enyear End year.
+#' @return Vector of date strings in "YYYY.MM.DD" format.
+#' @export
 validFolders <- function(styear = 2000, enyear = as.numeric(format(Sys.Date(), "%Y"))) {
   valid <- vector()
   for (y in styear:enyear) {
@@ -176,6 +205,12 @@ validFolders <- function(styear = 2000, enyear = as.numeric(format(Sys.Date(), "
   valid
 }
 
+#' @title Get Subfolder from DOY and Year
+#' @description Finds the valid MODIS subfolder date string for a given DOY and year.
+#' @param doy Day of Year.
+#' @param year Year.
+#' @return A string representing the folder date in "YYYY.MM.DD" format.
+#' @export
 subFolderFromDoy <- function(doy, year) {
   valid <- validFolders()
   dirdate <- format(as.Date(paste(doy, year), "%j %Y"), "%Y.%m.%d")

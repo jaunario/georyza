@@ -1,3 +1,17 @@
+#' @title Crop Extract
+#' @description Extracts crop information from a time series of vegetation indices.
+#' @param vi A vector of vegetation index values. The first two elements are tile and cell IDs.
+#' @param dates A vector of dates corresponding to the VI values.
+#' @param vi.label Label for the vegetation index (e.g., "evi").
+#' @param interval The data interval.
+#' @param senescence.min Minimum length of the senescence period.
+#' @param growth.min Minimum length of the growth period.
+#' @param seasonends.pctdiff Percentage difference to consider for season ends.
+#' @param negligible.change Value below which change is considered negligible.
+#' @param data.save Path to save detected crop data.
+#' @param as.z Logical; if TRUE, computes z-scores for VI values.
+#' @return A list of extracted crop VI values or a vector of metrics.
+#' @export
 crop.extract <- function(vi, dates, vi.label = "evi", interval = 1, senescence.min = 5, growth.min = 6, seasonends.pctdiff = 0.1, negligible.change = 100, data.save = NULL, as.z = FALSE) {
   # vi should include h and v tile value (vi[1]) and cell_id (vi[2]). This will be used when caching VI's of crop curve
 

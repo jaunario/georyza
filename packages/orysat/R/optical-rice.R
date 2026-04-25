@@ -22,6 +22,19 @@ pheno.cropstart <- function() {}
 #     3000000+idx3*10000+idx2*100+idx1 - 3 Seasons of Rice
 
 
+#' @title Rice Detection using Xiao Algorithm (v1)
+#' @description Pixel-level implementation of the Xiao rice mapping algorithm using EVI, LSWI, and NDVI.
+#' @param evi Vector of Enhanced Vegetation Index values.
+#' @param lswi Vector of Land Surface Water Index values.
+#' @param ndvi Optional vector of Normalized Difference Vegetation Index values.
+#' @param evi.floodmax Maximum EVI value during flooding.
+#' @param evi.ricemax Maximum EVI value for rice.
+#' @param evi.halfricemax Half of the maximum EVI value for rice.
+#' @param rnr.only Logical; if TRUE, returns binary rice/non-rice (1/0).
+#' @param data.interval Interval between data points in days.
+#' @param crop.duration Expected duration of the crop in days.
+#' @return If rnr.only is TRUE, 1 for rice, 0 for non-rice. If FALSE, returns a coded integer representing seasons and start dates.
+#' @export
 rice.Xiao_v1 <- function(evi, lswi, ndvi = NULL, evi.floodmax = 0.25, evi.ricemax = -1, evi.halfricemax = -1, rnr.only = FALSE, data.interval = 8, crop.duration = 120) {
   rice <- 0
   if (is.null(ndvi)) ndvi <- evi
@@ -158,6 +171,18 @@ rice.Xiao_v1 <- function(evi, lswi, ndvi = NULL, evi.floodmax = 0.25, evi.ricema
 # }
 
 
+#' @title Modified Xiao Rice Detection
+#' @description Adjustable Xiao-based rice detection algorithm that accepts custom vegetation indices and flood vectors.
+#' @param ts.vi Time series of vegetation index values.
+#' @param ts.flood Time series of flood detection (logical vector).
+#' @param analysis.fun Function used to analyze the VI during the potential rice period.
+#' @param sos.fun Function to determine the Start of Season from potential flooding points (e.g., min or max).
+#' @param data.interval Interval between data points in days.
+#' @param crop.duration Expected duration of the crop in days.
+#' @param rnr.only Logical; if TRUE, returns binary rice/non-rice (1/0).
+#' @param ... Additional arguments passed to analysis.fun.
+#' @return Coded integer representing rice detection results.
+#' @export
 rice.modxiao <- function(ts.vi, ts.flood = NULL, analysis.fun = xiaoflags.rice, sos.fun = min, data.interval = 8, crop.duration = 120, rnr.only = FALSE, ...) {
   # Adjustable Xiao-based rice detection algorithm.
   # Input any vegetation index, any flood vector
@@ -254,6 +279,17 @@ rice.modxiao <- function(ts.vi, ts.flood = NULL, analysis.fun = xiaoflags.rice, 
 
 # TODO: Could be good to convert into a more generic function that can detect "hills"
 #      in a time series
+#' @title Crop Signature Detection (Legacy)
+#' @description Detects "hills" or crop signatures in a time series of vegetation indices.
+#' @param vi Vector of vegetation index values.
+#' @param dates Optional vector of dates.
+#' @param interval Data interval.
+#' @param senescence.min Minimum length of senescence period.
+#' @param growth.min Minimum length of growth period.
+#' @param seasonends.pctdiff Percentage difference for season ends.
+#' @param negligible.change Threshold for negligible change.
+#' @return A data frame containing detected crop parameters (sos, pos, eos, etc.).
+#' @export
 crop.signature <- function(vi, dates = null, interval = 1, senescence.min = 5, growth.min = 6, seasonends.pctdiff = 0.1, negligible.change = 100) {
   # stdvi <- (vi-mean(vi))/sd(vi)
   dx <- diff(vi) # Find out which ones are increasing and decreasing
@@ -612,6 +648,16 @@ crop.signature <- function(vi, dates = null, interval = 1, senescence.min = 5, g
   # SENESCE RATE
 }
 
+#' @title Rice Detection using VWI Dynamics
+#' @description Detects rice based on the dynamics of Vegetation and Water Indices (VWI).
+#' @param vi Vector of vegetation index values.
+#' @param wi Vector of water index values.
+#' @param flowering.period Minimum period (in data points) to flowering.
+#' @param latest.planting Latest possible planting date (index).
+#' @param max.evi Maximum possible EVI value.
+#' @param ripening.period Period (in data points) for ripening.
+#' @return A data frame with rice detection details or an empty vector.
+#' @export
 rice.VWIdynamics <- function(vi, wi, flowering.period = 7, latest.planting = 50, max.evi = 7000, ripening.period = 8) {
   result <- vector()
   # steps
@@ -676,6 +722,17 @@ rice.VWIdynamics <- function(vi, wi, flowering.period = 7, latest.planting = 50,
   result
 }
 
+#' @title Iterative Regression for Rice Detection
+#' @description Performs iterative quadratic regression on segments of EVI time series to detect rice.
+#' @param pix.evi Vector of EVI values for a pixel.
+#' @param evi.date Vector of dates for the EVI values.
+#' @param dates.covered Optional subset of dates to cover.
+#' @param width Width of the moving window in data points.
+#' @param increments Increment for the moving window.
+#' @param eos.evires Resolution factor for determining End of Season.
+#' @param alpha Significance level for the regression model.
+#' @return A matrix/data frame of detected rice seasons.
+#' @export
 rice.itreg <- function(pix.evi, evi.date, dates.covered = NULL, width = 15, increments = 5, eos.evires = 0.4, alpha = 0.05) {
   # Remove NAs
   missing <- which(is.na(pix.evi))
@@ -742,6 +799,12 @@ rice.itreg <- function(pix.evi, evi.date, dates.covered = NULL, width = 15, incr
 }
 
 
+#' @title Non-Rice Linear Regression
+#' @description Performs linear regression on a time series to check for non-rice patterns.
+#' @param ts.vi Time series of vegetation index values.
+#' @param vi.date Vector of dates.
+#' @return A vector of coefficients and statistics from the linear regression.
+#' @export
 nonrice.regression <- function(ts.vi, vi.date) {
   dat.vi <- data.frame(y = ts.vi, x = vi.date)
   dat.vi <- na.omit(dat.vi)
@@ -753,6 +816,18 @@ nonrice.regression <- function(ts.vi, vi.date) {
   dat.rice
 }
 
+#' @title Rice Time Series Analysis
+#' @description Generic rice detection algorithm for time series data using a specified analysis function.
+#' @param ts.vi Time series of vegetation index values.
+#' @param ts.date Time series of dates.
+#' @param ts.flood Optional time series of flood detection.
+#' @param analysis.fun Function used for rice analysis (default: regression.rice).
+#' @param data.interval Data interval in days.
+#' @param crop.duration Expected crop duration in days.
+#' @param rnr.only Logical; if TRUE, returns binary rice/non-rice.
+#' @param ... Additional arguments passed to analysis.fun.
+#' @return Rice detection results.
+#' @export
 rice.ts <- function(ts.vi, ts.date, ts.flood = NULL, analysis.fun = regression.rice, data.interval = 8, crop.duration = 160, rnr.only = FALSE, ...) {
   # Adjustable Xiao-based rice detection algorithm.
   # Input any vegetation index, any flood vector

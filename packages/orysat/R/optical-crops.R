@@ -1,3 +1,16 @@
+#' @title Crop Signature Detection
+#' @description Detects crop signatures in a time series of vegetation indices.
+#' @param vi A vector of vegetation index values. The first two elements are tile and cell IDs.
+#' @param dates A vector of dates corresponding to the VI values.
+#' @param interval The data interval (not used directly in logic).
+#' @param senescence.min Minimum length of the senescence period.
+#' @param growth.min Minimum length of the growth period.
+#' @param seasonends.pctdiff Percentage difference to consider for season ends.
+#' @param negligible.change Value below which change is considered negligible.
+#' @param data.save Path to save detected crop data.
+#' @param as.z Logical; if TRUE, computes z-scores for VI values.
+#' @return The number of detected crops.
+#' @export
 crop.signature <- function(vi, dates = null, interval = 1, senescence.min = 5, growth.min = 6, seasonends.pctdiff = 0.1, negligible.change = 100, data.save = null, as.z = FALSE) {
   # if(is.null(dates)) dates <- seq(1,366, by=8, lengt)
   tile <- vi[1]
